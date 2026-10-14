@@ -1,0 +1,30 @@
+{
+  "name": "beyond-footprints",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives-severity=error",
+    "lint:fix": "oxlint --type-aware --fix",
+    "stats": "tsx scripts/stats.ts",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@types/node": "^26.6.4",
+    "happy-dom": "^21.0.1",
+    "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "^7.0.2003",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3"
+  }
+}

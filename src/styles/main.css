@@ -1,0 +1,1043 @@
+/* ===== トークン（Figma 由来） ===== */
+:root {
+  --bg: #e9dab4;
+  --paper: #f3e6c4;
+  --paper-light: #f5ebd0;
+  --paper-dark: #d9c394;
+  --cell-arrow: #e6cc8f;
+  --cell-border: #a07a48;
+  --ink: #4a2c14;
+  --ink-sub: #7a5a3a;
+  --brown: #6b3e1f;
+  --brown-line: #8b5e34;
+  --red: #9b2c1c;
+  --minimap-border: #b8935e;
+  --font-body: 'Yuji Syuku', serif;
+  --font-title: 'Yuji Boku', serif;
+  /* 英字のゲーム名（Yuji Boku の英字は R が A に見えるので使わない） */
+  --font-logo: 'Yuji Syuku', serif;
+  --shadow-float: 0 3px 8px rgba(74, 43, 20, 0.25);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+img {
+  display: block;
+}
+
+#app {
+  min-height: 100%;
+}
+
+.screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+}
+
+/* ===== ちぎれた紙 ===== */
+/*
+ * 紙の縁は 9 分割の枠（border-image）で描く。要素の大きさに関係なく、
+ * 縁の線の太さとギザギザの大きさが一定になる（画像を引き伸ばすと線が細くなったり、
+ * ギザギザが大きくなって中身にかぶったりするため）。
+ * 枠の 12px は余白も兼ねるので、各要素の padding は「見せたい余白 - 12px」にする。
+ */
+.paper {
+  --paper-edge: 12px;
+  position: relative;
+  border: var(--paper-edge) solid transparent;
+  border-image: url('../assets/paper-card.svg') 12 fill / var(--paper-edge) / 0 round;
+}
+.paper--grid {
+  border-image-source: url('../assets/paper-grid-start.svg');
+}
+.paper--result {
+  border-image-source: url('../assets/paper-result.svg');
+}
+.paper--modal {
+  border-image-source: url('../assets/paper-modal.svg');
+}
+
+/* ===== ボタン ===== */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 32px;
+  border-radius: 999px;
+  font-size: 20px;
+  white-space: nowrap;
+  transition: transform 0.08s, filter 0.15s;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn--primary {
+  background: var(--brown);
+  color: var(--paper-light);
+}
+.btn--primary:hover {
+  filter: brightness(1.1);
+}
+.btn--secondary {
+  background: var(--paper);
+  border: 2px solid var(--brown-line);
+  color: var(--ink);
+}
+.btn--secondary:hover {
+  filter: brightness(0.97);
+}
+.btn--wide {
+  width: 240px;
+}
+.btn--full {
+  width: 100%;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--paper);
+  border: 1px solid var(--brown-line);
+  border-radius: 999px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.pill--help {
+  padding: 8px 18px 8px 14px;
+  font-size: 15px;
+}
+.pill--help img {
+  width: 18px;
+  height: 18px;
+}
+.pill--reset {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--brown-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.icon-btn img {
+  width: 22px;
+  height: 22px;
+}
+
+/* ===== マス（DOM 版: タイトルとルールで使用） ===== */
+.cell {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  background: var(--paper-light);
+  border: 1px solid var(--cell-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.cell img.arrow {
+  width: 24px;
+  height: 24px;
+}
+.cell img.treasure {
+  width: 28px;
+  height: 28px;
+}
+.cell--arrow {
+  background: var(--cell-arrow);
+}
+.cell--nothing {
+  background: #ead9b0;
+}
+.cell__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cell-border);
+}
+.cell--treasure {
+  border: 2px solid var(--red);
+}
+.cell--found {
+  border: 3px solid var(--red);
+  filter: drop-shadow(0 0 5px rgba(155, 44, 28, 0.6));
+}
+.cell--player {
+  border: none;
+  background: none;
+}
+.cell--player img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cell__start {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+  z-index: 1;
+}
+
+.mini-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+}
+.mini-grid__row {
+  display: flex;
+  gap: 4px;
+}
+
+/* ===== D-pad ===== */
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 60px);
+  grid-template-rows: repeat(3, 60px);
+  gap: 8px;
+}
+.dpad__btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  background: var(--brown);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 3px 0 rgba(74, 43, 20, 0.35));
+  touch-action: manipulation;
+  user-select: none;
+}
+.dpad__btn:active {
+  transform: translateY(2px);
+  filter: none;
+}
+.dpad__btn img {
+  width: 28px;
+  height: 28px;
+}
+.dpad__btn[data-dir='up'] {
+  grid-area: 1 / 2;
+}
+.dpad__btn[data-dir='left'] {
+  grid-area: 2 / 1;
+}
+.dpad__btn[data-dir='right'] {
+  grid-area: 2 / 3;
+}
+.dpad__btn[data-dir='down'] {
+  grid-area: 3 / 2;
+}
+
+/* ===== タイトル / N 入力 ===== */
+.title-screen {
+  justify-content: center;
+  gap: 32px;
+}
+.n-screen {
+  justify-content: center;
+  gap: 36px;
+}
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+.brand__title {
+  font-family: var(--font-logo);
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+}
+
+.n-card {
+  width: 100%;
+  max-width: 350px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.n-card__label {
+  font-size: 18px;
+}
+.n-card__desc {
+  font-size: 13px;
+  color: var(--ink-sub);
+  margin: 0;
+  line-height: 1.5;
+}
+.n-input {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--paper-dark);
+  border: 2px solid var(--red);
+  border-radius: 12px;
+  padding: 14px 20px;
+}
+.n-input input {
+  font-family: var(--font-body);
+  font-size: 28px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  outline: none;
+  width: 100%;
+  min-width: 0;
+  caret-color: var(--red);
+}
+.n-input__hint {
+  font-size: 14px;
+  color: var(--ink-sub);
+  white-space: nowrap;
+}
+.n-input--error {
+  border-style: dashed;
+}
+.n-card__error {
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+.n-card__error:empty {
+  display: none;
+}
+.n-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ===== ゲーム画面 ===== */
+.game {
+  padding-top: 56px;
+  padding-bottom: 24px;
+  gap: 18px;
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+}
+.game__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.board-info__title {
+  font-family: var(--font-logo);
+  font-size: 18px;
+}
+.board-info__sub {
+  font-size: 13px;
+  color: var(--ink-sub);
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hud {
+  width: 100%;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hud__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+.hud__label {
+  font-size: 14px;
+  color: var(--ink-sub);
+}
+.hud__count {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.hud__left {
+  font-size: 26px;
+  color: var(--red);
+  line-height: 1.2;
+}
+.hud__max {
+  font-size: 14px;
+  color: var(--ink-sub);
+  line-height: 1.6;
+}
+.hud__bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-dark);
+  overflow: hidden;
+}
+.hud__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--red);
+  transition: width 0.15s;
+}
+
+.board-panel {
+  width: 100%;
+  /* 枠 12px + 2px: 盤面が紙の縁にかからないようにする */
+  padding: 2px;
+}
+.board-viewport {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  touch-action: none;
+}
+.board-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.board-panel--fit .board-viewport {
+  aspect-ratio: 1;
+}
+.board-panel--explore .board-viewport {
+  height: 356px;
+  cursor: grab;
+}
+.board-panel--explore .board-viewport.dragging {
+  cursor: grabbing;
+}
+
+.pos-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  background: rgba(245, 235, 208, 0.95);
+  border: 1px solid var(--brown-line);
+  border-radius: 999px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pos-badge__label {
+  font-size: 11px;
+  color: var(--ink-sub);
+}
+.pos-badge__value {
+  font-size: 13px;
+}
+
+.zoom {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  background: rgba(245, 235, 208, 0.97);
+  border: 1.2px solid var(--brown-line);
+  border-radius: 999px;
+  box-shadow: var(--shadow-float);
+}
+.zoom--vertical {
+  right: 8px;
+  bottom: 8px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+}
+.zoom--horizontal {
+  right: 20px;
+  bottom: 18px;
+  gap: 4px;
+  padding: 6px;
+}
+.zoom__btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.zoom__btn img {
+  width: 20px;
+  height: 20px;
+}
+.zoom__btn--fit img {
+  width: 18px;
+  height: 18px;
+}
+.zoom__btn--dark {
+  background: var(--brown);
+}
+.zoom__level {
+  color: var(--ink-sub);
+  font-size: 11px;
+}
+.zoom--horizontal .zoom__level {
+  color: var(--ink);
+  font-size: 15px;
+  padding: 0 8px;
+  min-width: 59px;
+  text-align: center;
+}
+.zoom__divider {
+  background: rgba(139, 94, 52, 0.5);
+}
+.zoom--vertical .zoom__divider {
+  width: 24px;
+  height: 1px;
+}
+.zoom--horizontal .zoom__divider {
+  width: 1px;
+  height: 24px;
+}
+.zoom__wide {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px 9px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  white-space: nowrap;
+  background: var(--paper);
+}
+.zoom__wide img {
+  width: 18px;
+  height: 18px;
+}
+.zoom__wide--dark {
+  background: var(--brown);
+  color: var(--paper-light);
+}
+
+.game__bottom {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.game__bottom--explore {
+  justify-content: space-between;
+}
+.minimap-card {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border-image-source: url('../assets/paper-modal.svg');
+}
+.minimap-card__title {
+  font-size: 13px;
+}
+.minimap {
+  display: block;
+  cursor: pointer;
+  touch-action: none;
+}
+.game__hint {
+  font-size: 12px;
+  color: var(--ink-sub);
+  margin: 0;
+}
+
+/* 結果カード */
+.result-card {
+  width: 100%;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.result-card__title {
+  font-family: var(--font-title);
+  font-size: 34px;
+  color: var(--red);
+}
+.result-card__title--lost {
+  color: var(--ink);
+}
+.result-card__msg {
+  margin: 0 -13px;
+  font-size: 14px;
+  color: var(--ink-sub);
+  text-align: center;
+}
+.share-row {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+.share-row .btn {
+  flex: 1 0 0;
+  min-width: 0;
+}
+.btn--small {
+  padding: 10px 12px;
+  font-size: 16px;
+}
+.result-card__actions {
+  margin-top: 4px;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+.result-card__actions .btn {
+  flex: 1 0 0;
+  min-width: 0;
+  padding: 16px 12px;
+}
+
+/* ===== PC レイアウト ===== */
+@media (min-width: 1024px) {
+  .game--pc {
+    max-width: none;
+    height: 100dvh;
+    padding: 32px;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 32px;
+  }
+  .sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow-y: auto;
+  }
+  .sidebar__title {
+    font-family: var(--font-logo);
+    font-size: 32px;
+    line-height: 1.15;
+  }
+  .sidebar__sub {
+    font-size: 14px;
+    color: var(--ink-sub);
+  }
+  .sidebar .actions {
+    display: flex;
+    gap: 10px;
+  }
+  .sidebar .pill--reset {
+    padding: 9px 16px;
+    font-size: 15px;
+  }
+  .sidebar .hud {
+    padding: 4px 6px;
+  }
+  .sidebar .hud__label {
+    font-size: 15px;
+  }
+  .sidebar .hud__left {
+    font-size: 32px;
+  }
+  .sidebar .hud__max {
+    font-size: 15px;
+  }
+  .sidebar .hud--long .hud__left {
+    font-size: 26px;
+  }
+  .sidebar .hud--long .hud__max {
+    font-size: 13px;
+  }
+  .side-card {
+    padding: 4px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-image-source: url('../assets/paper-modal.svg');
+  }
+  .side-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+  }
+  .side-card__head small {
+    font-size: 12px;
+    color: var(--ink-sub);
+  }
+  .legend {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--ink-sub);
+  }
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend__rect {
+    width: 12px;
+    height: 10px;
+    border: 1.5px solid var(--red);
+    background: rgba(155, 44, 28, 0.12);
+  }
+  .legend__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+  }
+  .keys {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .keys__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--ink-sub);
+  }
+  .key {
+    background: var(--paper-light);
+    border: 1px solid var(--brown-line);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    color: var(--ink);
+  }
+  .game--pc .board-panel {
+    flex: 1;
+    padding: 6px;
+    position: relative;
+    display: flex;
+  }
+  .game--pc .board-viewport {
+    height: auto;
+    flex: 1;
+    cursor: grab;
+  }
+  .game--pc .pos-badge {
+    top: 18px;
+    left: 20px;
+    padding: 8px 14px;
+    gap: 10px;
+  }
+  .game--pc .pos-badge__label {
+    font-size: 13px;
+  }
+  .game--pc .pos-badge__value {
+    font-size: 15px;
+  }
+  .game--pc .result-card {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px;
+    z-index: 2;
+  }
+}
+
+/* ===== ルールモーダル ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 26, 12, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+.rules {
+  width: 100%;
+  max-width: 350px;
+  /* 影は紙の画像ではなく CSS で付ける（縁を繰り返し描くと影がギザギザに見えるため） */
+  filter: drop-shadow(0 6px 8px rgba(43, 26, 12, 0.35));
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rules__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rules__title {
+  font-family: var(--font-title);
+  font-size: 28px;
+}
+.rules__close {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--paper-light);
+  border: 1px solid var(--brown-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rules__close img {
+  width: 18px;
+  height: 18px;
+}
+.story {
+  background: var(--paper-light);
+  border: 1px dashed var(--brown-line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.story__label {
+  font-size: 12px;
+  color: var(--ink-sub);
+}
+.story p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.rule {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.rule p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  flex: 1;
+}
+.rule .dpad__btn {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.rule .dpad__btn img {
+  width: 20.5px;
+  height: 20.5px;
+}
+
+/* ===== 確認モーダル ===== */
+.confirm {
+  width: 100%;
+  max-width: 350px;
+  padding: 10px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  filter: drop-shadow(0 6px 8px rgba(43, 26, 12, 0.35));
+}
+.confirm__title {
+  font-family: var(--font-title);
+  font-size: 26px;
+}
+.confirm__msg {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-sub);
+}
+.confirm__actions {
+  margin-top: 6px;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+}
+.confirm__actions .btn {
+  flex: 1 0 0;
+  min-width: 0;
+  padding: 14px 12px;
+  font-size: 18px;
+}
+
+/* ===== リプレイ（結果画面） ===== */
+.replay {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.replay__canvas {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  height: auto;
+}
+.result-card .replay__canvas {
+  max-width: 258px;
+}
+.board-panel--replay {
+  padding: 2px 0 0;
+}
+.playback {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 4px;
+}
+.play-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.play-btn img {
+  width: 14px;
+  height: 14px;
+}
+.play-btn--pause::before {
+  content: '';
+  width: 10px;
+  height: 12px;
+  border-left: 3px solid var(--paper-light);
+  border-right: 3px solid var(--paper-light);
+}
+.scrub {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 24px;
+}
+.scrub__track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: var(--paper-dark);
+  border: 1px solid var(--cell-border);
+  border-radius: 999px;
+}
+.scrub__progress {
+  position: absolute;
+  left: 0;
+  top: 9px;
+  height: 6px;
+  background: var(--red);
+  border-radius: 999px;
+}
+.scrub__tick {
+  position: absolute;
+  top: 7px;
+  width: 1.5px;
+  height: 10px;
+  background: var(--brown-line);
+  opacity: 0.5;
+}
+.scrub__knob {
+  position: absolute;
+  top: 1px;
+  width: 26px;
+  height: 26px;
+  pointer-events: none;
+}
+.scrub input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.playback__label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.loading-screen {
+  justify-content: center;
+}
+.loading {
+  font-size: 15px;
+  color: var(--ink-sub);
+  margin: 0;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  background: var(--brown);
+  color: var(--paper-light);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 20;
+  pointer-events: none;
+}

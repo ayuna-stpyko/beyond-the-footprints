@@ -11,6 +11,7 @@ import helpLabel from '../assets/help-label.svg';
 import iconBack from '../assets/icon-back.svg';
 import iconClose from '../assets/icon-close.svg';
 import iconFit from '../assets/icon-fit.svg';
+import iconHome from '../assets/icon-home.svg';
 import iconPlay from '../assets/icon-play.svg';
 import iconRecenter from '../assets/icon-recenter.svg';
 import iconShare from '../assets/icon-share.svg';
@@ -24,7 +25,7 @@ import playerUp from '../assets/player-up.svg';
 import treasure from '../assets/treasure.svg';
 
 export const icons = {
-  helpIcon, helpLabel, iconBack, iconClose, iconFit, iconPlay, iconRecenter, iconShare,
+  helpIcon, helpLabel, iconBack, iconClose, iconFit, iconHome, iconPlay, iconRecenter, iconShare,
   iconZoomIn, iconZoomOut, knob, treasure,
 };
 

@@ -156,13 +156,29 @@ function resultCard(g: GameState, actions: GameActions, replay?: HTMLElement) {
   );
 }
 
+/** 「タイトルへ」: 途中まで遊んでいるときだけ確認する。label で文字付き（PC 用）にする */
+function titleButton(g: GameState, actions: GameActions, label: boolean) {
+  const onclick = () => {
+    if (g.status !== 'playing' || movesUsed(g) === 0) return actions.title();
+    openConfirm({
+      title: 'タイトルへもどりますか？',
+      message: '遊んでいた盤面は保存されません。',
+      ok: 'タイトルへ',
+      onOk: actions.title,
+    });
+  };
+  return label
+    ? h('button.pill.pill--title', { onclick }, img(icons.iconHome), 'タイトルへ')
+    : h('button.icon-btn', { onclick, 'aria-label': 'タイトルへ' }, img(icons.iconHome));
+}
+
 /** 「やりなおす」: 途中まで遊んでいるときだけ確認する */
 function resetButton(g: GameState, actions: GameActions) {
   const onclick = () => {
     if (g.status !== 'playing' || movesUsed(g) === 0) return actions.restart();
     openConfirm({
       title: 'やりなおしますか？',
-      message: 'この盤面を最初からやりなおします。ここまでの移動はなくなります。',
+      message: 'ここまでの移動はなくなります。',
       ok: 'やりなおす',
       onOk: actions.restart,
     });
@@ -275,7 +291,9 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
   const zoom = zoomControls(view, true);
   const minimap = mode === 'explore' ? new Minimap(game, view, MINIMAP_PX_MOBILE) : null;
 
-  const headerActions = h('div.header-actions', {}, helpIconButton(openRules), resetButton(game, actions));
+  const home = titleButton(game, actions, false);
+  const help = helpIconButton(openRules);
+  const headerActions = h('div.header-actions', {}, home, help, resetButton(game, actions));
   const panel = h(`section.board-panel.paper.paper--grid.board-panel--${mode}`, {}, view.el);
   panel.style.position = 'relative';
   if (mode === 'explore') panel.append(badge.el, zoom.el);
@@ -296,7 +314,9 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
   const showControls = (justEnded = false) => {
     bottom.replaceChildren();
     if (game.status !== 'playing') {
-      headerActions.firstElementChild?.remove();
+      // 結果カードに「タイトルへ」と「あそびかた」の代わりがあるので、ヘッダーからは外す
+      home.remove();
+      help.remove();
       // 盤面の枠をリプレイ（GIF と同じ絵）に差し替える。終わった直後は自動で 1 回再生する
       replay = replayPlayer(game, REPLAY_PX_MOBILE, { autoplay: justEnded });
       panel.className = 'board-panel paper paper--grid board-panel--replay';
@@ -378,7 +398,7 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
         'aside.sidebar',
         {},
         h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, boardLabel(game.board.n, true))),
-        h('div.actions', {}, helpLabelButton(openRules), resetButton(game, actions)),
+        h('div.actions', {}, helpLabelButton(openRules), resetButton(game, actions), titleButton(game, actions, true)),
         h1.el,
         h(
           'section.side-card.paper',

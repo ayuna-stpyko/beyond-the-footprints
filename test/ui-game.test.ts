@@ -63,6 +63,9 @@ function buttonByText(label: string) {
   return btn;
 }
 
+/** モバイルはアイコン、PC は文字付きの「タイトルへ」ボタン */
+const titleBtn = () => q('button[aria-label="タイトルへ"], .pill--title')!;
+
 let disposers: (() => void)[] = [];
 
 function mount(game: GameState) {
@@ -226,6 +229,31 @@ describe.each([
     expect(actions.restart).toHaveBeenCalledTimes(1);
   });
 
+  it('goes to the title immediately when no move has been made', () => {
+    const { actions } = mount(newGame(generateBoard(3, 1)));
+    titleBtn().click();
+    expect(actions.title).toHaveBeenCalledTimes(1);
+    expect(q('.overlay')).toBeNull();
+  });
+
+  it('asks for confirmation before going to the title after a move', () => {
+    const g = newGame(generateBoard(3, 1));
+    const { actions } = mount(g);
+    pressKey(ARROW[safeDir(g)]);
+    titleBtn().click();
+    expect(q('.overlay')).not.toBeNull();
+    expect(actions.title).not.toHaveBeenCalled();
+
+    buttonByText('キャンセル').click();
+    expect(q('.overlay')).toBeNull();
+    expect(actions.title).not.toHaveBeenCalled();
+
+    titleBtn().click();
+    q('.overlay .btn--primary')!.click();
+    expect(q('.overlay')).toBeNull();
+    expect(actions.title).toHaveBeenCalledTimes(1);
+  });
+
   it('stops handling keys after dispose', () => {
     const g = newGame(generateBoard(3, 1));
     const { dispose } = mount(g);
@@ -327,7 +355,7 @@ describe('gameScreen (mobile)', () => {
     expect(q('.board-panel--replay .replay')).not.toBeNull();
     expect(q('.dpad')).toBeNull();
     expect(q('.game__hint')).toBeNull();
-    // あそびかたボタンは消え、やりなおすだけ残る
+    // タイトルへ・あそびかたのアイコンは消え（結果カードにある）、やりなおすだけ残る
     expect(q('.header-actions .icon-btn')).toBeNull();
     expect(q('.header-actions .pill--reset')).not.toBeNull();
   });

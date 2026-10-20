@@ -149,6 +149,14 @@ img {
   padding: 8px 16px;
   font-size: 13px;
 }
+.pill--title {
+  padding: 8px 18px 8px 14px;
+  font-size: 15px;
+}
+.pill--title img {
+  width: 18px;
+  height: 18px;
+}
 .icon-btn {
   width: 36px;
   height: 36px;
@@ -682,6 +690,7 @@ img {
   }
   .sidebar .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
   }
   .sidebar .pill--reset {
@@ -885,9 +894,12 @@ img {
 }
 
 /* ===== 確認モーダル ===== */
+.overlay:has(.confirm) {
+  padding: 12px;
+}
 .confirm {
   width: 100%;
-  max-width: 350px;
+  max-width: 480px;
   padding: 10px 8px 8px;
   display: flex;
   flex-direction: column;
@@ -898,7 +910,9 @@ img {
 }
 .confirm__title {
   font-family: var(--font-title);
-  font-size: 26px;
+  /* 見出しは 1 行に収める。狭いスマホ（360px 以下）では少し小さくする */
+  font-size: min(26px, 6.5vw);
+  white-space: nowrap;
 }
 .confirm__msg {
   margin: 0;

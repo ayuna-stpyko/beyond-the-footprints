@@ -7,7 +7,7 @@ import { GAP_RATIO, ZOOM_STEP } from '../constants';
 import { h, img } from '../dom';
 import { Minimap } from '../minimap';
 import { replayPlayer } from '../replayPlayer';
-import { shareButtons } from '../share';
+import { type ChallengeInfo, shareButtons } from '../share';
 import { boardLabel, dpadButton, helpIconButton, helpLabelButton } from './common';
 import { modalOpen, openConfirm } from './confirm';
 import { openRules } from './rules';
@@ -20,7 +20,25 @@ export interface GameActions {
   again: () => void;
   /** シェアする盤面のリンク */
   shareUrl: string;
+  /** チャレンジとして遊んでいるとき。クリア後はやりなおせない */
+  challenge?: ChallengeInfo;
+  /** 1 手動くたびに呼ぶ（自動セーブ用） */
+  onMove?: () => void;
 }
+
+/**
+ * 盤面の見出しの表示（チャレンジなら期間と挑戦回数、それ以外は N）。
+ * 狭い画面では「ウィークリー」「10/19〜」「・2回目」の区切りでだけ折り返す
+ */
+const boardTitle = (g: GameState, actions: GameActions, withMasu = false): (string | HTMLElement)[] => {
+  const ch = actions.challenge;
+  if (!ch) return [boardLabel(g.board.n, withMasu)];
+  const [name, ...rest] = ch.heading.split(' ');
+  return [h('span.nowrap', {}, name), ' ', h('span.nowrap', {}, rest.join(' ')), h('span.nowrap', {}, `・${ch.attempt}回目`)];
+};
+
+/** チャレンジでクリアしたら、その盤面はもう遊べない */
+const locked = (g: GameState, actions: GameActions) => !!actions.challenge && g.status === 'won';
 
 /** main.css の PC レイアウトの @media と対応 */
 const PC_QUERY = '(min-width: 1024px)';
@@ -136,6 +154,12 @@ function zoomControls(view: BoardView, vertical: boolean) {
 /** 結果カード。replay を渡すと（PC 用に）カードの先頭にリプレイを入れる */
 function resultCard(g: GameState, actions: GameActions, replay?: HTMLElement) {
   const won = g.status === 'won';
+  const ch = actions.challenge;
+  const again = ch
+    ? won
+      ? null
+      : h('button.btn.btn--primary', { onclick: actions.restart }, 'もう一度挑戦')
+    : h('button.btn.btn--primary', { onclick: actions.again }, 'もう一度');
   return h(
     'section.result-card.paper.paper--result',
     {},
@@ -144,22 +168,25 @@ function resultCard(g: GameState, actions: GameActions, replay?: HTMLElement) {
     h(
       'div.result-card__msg',
       {},
-      won ? `${movesUsed(g)}歩で宝を見つけました。` : '歩数を使い切りました。',
+      (ch ? `${ch.attempt}回目の挑戦、` : '') + (won ? `${movesUsed(g)}歩で宝を見つけました。` : '歩数を使い切りました。'),
     ),
-    shareButtons(g, actions.shareUrl),
+    shareButtons(g, actions.shareUrl, ch),
     h(
       'div.result-card__actions',
       {},
       h('button.btn.btn--secondary', { onclick: actions.title }, 'タイトルへ'),
-      h('button.btn.btn--primary', { onclick: actions.again }, 'もう一度'),
+      again,
     ),
   );
 }
 
-/** 「タイトルへ」: 途中まで遊んでいるときだけ確認する。label で文字付き（PC 用）にする */
+/**
+ * 「タイトルへ」: 途中まで遊んでいるときだけ確認する。label で文字付き（PC 用）にする。
+ * チャレンジは自動セーブされて続きから遊べるので、確認しない
+ */
 function titleButton(g: GameState, actions: GameActions, label: boolean) {
   const onclick = () => {
-    if (g.status !== 'playing' || movesUsed(g) === 0) return actions.title();
+    if (actions.challenge || g.status !== 'playing' || movesUsed(g) === 0) return actions.title();
     openConfirm({
       title: 'タイトルへもどりますか？',
       message: '遊んでいた盤面は保存されません。',
@@ -178,7 +205,8 @@ function resetButton(g: GameState, actions: GameActions) {
     if (g.status !== 'playing' || movesUsed(g) === 0) return actions.restart();
     openConfirm({
       title: 'やりなおしますか？',
-      message: 'ここまでの移動はなくなります。',
+      // チャレンジでは、動いたあとのやりなおしは次の挑戦に数える
+      message: actions.challenge ? `${actions.challenge.attempt + 1}回目の挑戦としてやりなおします。` : 'ここまでの移動はなくなります。',
       ok: 'やりなおす',
       onOk: actions.restart,
     });
@@ -243,9 +271,11 @@ function controller(
   view: BoardView,
   refresh: () => void,
   onEnd: () => void,
+  onMove: () => void = noop,
 ) {
   const doMove = (d: Exclude<Dir, 0>) => {
     if (!move(game, d)) return;
+    onMove();
     view.follow();
     refresh();
     if (game.status !== 'playing') {
@@ -293,7 +323,8 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
 
   const home = titleButton(game, actions, false);
   const help = helpIconButton(openRules);
-  const headerActions = h('div.header-actions', {}, home, help, resetButton(game, actions));
+  const reset = resetButton(game, actions);
+  const headerActions = h('div.header-actions', {}, home, help, reset);
   const panel = h(`section.board-panel.paper.paper--grid.board-panel--${mode}`, {}, view.el);
   panel.style.position = 'relative';
   if (mode === 'explore') panel.append(badge.el, zoom.el);
@@ -317,6 +348,7 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
       // 結果カードに「タイトルへ」と「あそびかた」の代わりがあるので、ヘッダーからは外す
       home.remove();
       help.remove();
+      if (locked(game, actions)) reset.remove();
       // 盤面の枠をリプレイ（GIF と同じ絵）に差し替える。終わった直後は自動で 1 回再生する
       replay = replayPlayer(game, REPLAY_PX_MOBILE, { autoplay: justEnded });
       panel.className = 'board-panel paper paper--grid board-panel--replay';
@@ -334,7 +366,7 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
       bottom.append(dpad(ctrl.doMove));
     }
   };
-  const ctrl = controller(game, view, refresh, () => showControls(true));
+  const ctrl = controller(game, view, refresh, () => showControls(true), actions.onMove);
 
   root.append(
     h(
@@ -343,7 +375,7 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
       h(
         'header.game__header',
         {},
-        h('div.board-info', {}, h('div.board-info__title', {}, 'BEYOND THE FOOTPRINTS'), h('div.board-info__sub', {}, boardLabel(game.board.n))),
+        h('div.board-info', {}, h('div.board-info__title', {}, 'BEYOND THE FOOTPRINTS'), h('div.board-info__sub', {}, ...boardTitle(game, actions))),
         headerActions,
       ),
       h1.el,
@@ -384,11 +416,13 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
     minimap.draw();
   };
   let replay: ReturnType<typeof replayPlayer> | null = null;
+  const reset = resetButton(game, actions);
   const onEnd = (justEnded = false) => {
+    if (locked(game, actions)) reset.remove();
     replay = replayPlayer(game, REPLAY_PX_PC, { autoplay: justEnded });
     panel.append(resultCard(game, actions, replay.el));
   };
-  const ctrl = controller(game, view, refresh, () => onEnd(true));
+  const ctrl = controller(game, view, refresh, () => onEnd(true), actions.onMove);
 
   root.append(
     h(
@@ -397,8 +431,8 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
       h(
         'aside.sidebar',
         {},
-        h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, boardLabel(game.board.n, true))),
-        h('div.actions', {}, helpLabelButton(openRules), resetButton(game, actions), titleButton(game, actions, true)),
+        h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, ...boardTitle(game, actions, true))),
+        h('div.actions', {}, helpLabelButton(openRules), reset, titleButton(game, actions, true)),
         h1.el,
         h(
           'section.side-card.paper',

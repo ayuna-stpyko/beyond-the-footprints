@@ -379,7 +379,7 @@ describe('titleScreen', () => {
   it('wires スタート and あそびかた to their actions', () => {
     const start = vi.fn<() => void>();
     const rules = vi.fn<() => void>();
-    const screen = titleScreen({ start, rules });
+    const screen = titleScreen({ start, rules, challenge: () => {} });
     document.body.append(screen);
     button('スタート', screen).click();
     expect(start).toHaveBeenCalledTimes(1);
@@ -390,7 +390,7 @@ describe('titleScreen', () => {
   });
 
   it('draws a 5x5 decorative grid with one treasure and one player', () => {
-    const screen = titleScreen({ start: () => {}, rules: () => {} });
+    const screen = titleScreen({ start: () => {}, rules: () => {}, challenge: () => {} });
     expect(screen.querySelectorAll('.mini-grid__row').length).toBe(5);
     expect(screen.querySelectorAll('.mini-grid .cell').length).toBe(25);
     expect(screen.querySelectorAll('.cell--treasure').length).toBe(1);

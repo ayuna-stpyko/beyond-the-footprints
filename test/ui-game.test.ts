@@ -68,7 +68,7 @@ const titleBtn = () => q('button[aria-label="タイトルへ"], .pill--title')!;
 
 let disposers: (() => void)[] = [];
 
-function mount(game: GameState) {
+function mount(game: GameState, extra: Partial<GameActions> = {}) {
   const root = document.createElement('div');
   document.body.append(root);
   const actions = {
@@ -76,6 +76,7 @@ function mount(game: GameState) {
     restart: vi.fn(),
     again: vi.fn(),
     shareUrl: 'https://example.com/beyond-footprints/?n=1&seed=5',
+    ...extra,
   } satisfies GameActions;
   const dispose = gameScreen(root, game, actions, false);
   disposers.push(dispose);
@@ -201,6 +202,46 @@ describe.each([
     expect(actions.title).toHaveBeenCalledTimes(1);
     buttonByText('もう一度').click();
     expect(actions.again).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks a cleared challenge', () => {
+    const g = winnableGame();
+    const onMove = vi.fn();
+    mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 2 }, onMove });
+    walkToTreasure(g);
+    expect(onMove).toHaveBeenCalledTimes(g.log.length - 1);
+    expect(text('.result-card__msg')).toBe(`2回目の挑戦、${g.log.length - 1}歩で宝を見つけました。`);
+    expect(q('.pill--reset')).toBeNull();
+    expect([...document.querySelectorAll('button')].some((b) => b.textContent?.trim() === 'もう一度')).toBe(false);
+  });
+
+  it('goes to the title without confirmation during a challenge (it is autosaved)', () => {
+    const g = newGame(generateBoard(3, 1));
+    const { actions } = mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 1 } });
+    pressKey(ARROW[safeDir(g)]);
+    titleBtn().click();
+    expect(q('.overlay')).toBeNull();
+    expect(actions.title).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells that restarting a challenge counts as the next attempt', () => {
+    const g = newGame(generateBoard(3, 1));
+    mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 2 } });
+    pressKey(ARROW[safeDir(g)]);
+    q('.pill--reset')!.click();
+    expect(text('.confirm__msg')).toBe('3回目の挑戦としてやりなおします。');
+    // 開いたままだと次のテストのキー操作が効かなくなる
+    buttonByText('キャンセル').click();
+  });
+
+  it('retries a lost challenge on the same board', () => {
+    const g = newGame(generateBoard(1, 5));
+    g.movesLeft = 1;
+    const { actions } = mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 1 } });
+    pressKey(ARROW[safeDir(g)]);
+    buttonByText('もう一度挑戦').click();
+    expect(actions.restart).toHaveBeenCalledTimes(1);
+    expect(actions.again).not.toHaveBeenCalled();
   });
 
   it('restarts immediately when no move has been made', () => {

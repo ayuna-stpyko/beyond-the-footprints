@@ -172,3 +172,27 @@ test.describe('mobile layout', () => {
     await expect(page.getByRole('button', { name: 'ゲーム開始' })).toBeDisabled();
   });
 });
+
+test('resumes a challenge after reloading and counts a retry as the next attempt', async ({ page }) => {
+  await page.goto('');
+  await page.getByRole('button', { name: /デイリー/ }).click();
+  await expect(hudLeft(page)).toHaveText('180', { timeout: 30_000 });
+  await expect(page.getByText(/デイリー .*・1回目/)).toBeVisible();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(hudLeft(page)).toHaveText('178');
+
+  // 自動セーブから続きを遊べる
+  await page.reload();
+  await expect(hudLeft(page)).toHaveText('178', { timeout: 30_000 });
+
+  // 動いたあとのやりなおしは 2 回目の挑戦になる
+  await page.getByRole('button', { name: 'やりなおす' }).first().click();
+  await page.locator('.confirm').getByRole('button', { name: 'やりなおす' }).click();
+  await expect(hudLeft(page)).toHaveText('180');
+  await expect(page.getByText(/デイリー .*・2回目/)).toBeVisible();
+
+  // タイトルには挑戦中と出る
+  await page.goto('');
+  await expect(page.getByRole('button', { name: /デイリー.*挑戦中/ })).toBeVisible();
+});

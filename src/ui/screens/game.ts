@@ -214,14 +214,33 @@ function resetButton(g: GameState, actions: GameActions) {
   return h('button.pill.pill--reset', { onclick }, 'やりなおす');
 }
 
+/** 長押しで連続移動を始めるまでの時間 */
+const REPEAT_DELAY_MS = 350;
+/** 連続移動の間隔 */
+const REPEAT_INTERVAL_MS = 90;
+
 function dpad(onMove: (d: Exclude<Dir, 0>) => void) {
   const btn = (name: 'up' | 'down' | 'left' | 'right', d: Exclude<Dir, 0>) => {
     const b = dpadButton(name);
-    // 連打しやすいよう pointerdown で反応させる
+    let timer: number | undefined;
+    const stop = () => {
+      window.clearTimeout(timer);
+      timer = undefined;
+    };
+    const repeat = () => {
+      // 結果表示などでボタンが外れたら止める
+      if (!b.isConnected) return stop();
+      onMove(d);
+      timer = window.setTimeout(repeat, REPEAT_INTERVAL_MS);
+    };
+    // 連打しやすいよう pointerdown で反応させ、押し続けている間は連続で動く
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      stop();
       onMove(d);
+      timer = window.setTimeout(repeat, REPEAT_DELAY_MS);
     });
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) b.addEventListener(type, stop);
     return b;
   };
   return h(

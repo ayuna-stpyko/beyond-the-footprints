@@ -18,6 +18,10 @@ import { openRules } from './ui/screens/rules';
 import { type ChallengeStatus, titleScreen } from './ui/screens/title';
 
 const app = document.getElementById('app')!;
+// ボタンの長押しで出る「画像を保存」などのメニューを出さない
+document.addEventListener('contextmenu', (e) => {
+  if (e.target instanceof Element && e.target.closest('button')) e.preventDefault();
+});
 const params = new URLSearchParams(location.search);
 const debug = params.has('debug');
 const genOptions: GenerateOptions = {};

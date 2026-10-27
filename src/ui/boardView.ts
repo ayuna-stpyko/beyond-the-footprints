@@ -8,7 +8,7 @@ const FIT_PAD = 8;
 /** 拡大の上限。縮小は盤面全体が収まる倍率まで */
 const MAX_ZOOM = 2;
 /** ホイール 1px あたりのズームの強さ */
-const WHEEL_ZOOM_SPEED = 0.0015;
+const WHEEL_ZOOM_SPEED = 0.015;
 /** 現在地を追いかけるとき、画面の端から空けておくマス数（狭い画面では画面幅の 1/4 まで） */
 const FOLLOW_MARGIN_CELLS = 2.5;
 const FOLLOW_MARGIN_MAX_RATIO = 1 / 4;

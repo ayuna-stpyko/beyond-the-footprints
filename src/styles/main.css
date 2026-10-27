@@ -608,6 +608,37 @@ img {
   gap: 2px;
   padding: 4px;
 }
+
+@media (max-width: 1023px) {
+  .pos-badge {
+    top: 6px;
+    left: 6px;
+    gap: 4px;
+    padding: 3px 9px;
+  }
+  .pos-badge__label {
+    font-size: 10px;
+  }
+  .pos-badge__value {
+    font-size: 11px;
+  }
+  .zoom--vertical {
+    right: 6px;
+    bottom: 6px;
+    padding: 3px;
+  }
+  .zoom--vertical .zoom__btn {
+    width: 32px;
+    height: 32px;
+  }
+  .zoom--vertical .zoom__btn img {
+    width: 16px;
+    height: 16px;
+  }
+  .zoom--vertical .zoom__level {
+    font-size: 10px;
+  }
+}
 .zoom--horizontal {
   right: 20px;
   bottom: 18px;

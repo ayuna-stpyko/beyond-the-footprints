@@ -121,9 +121,11 @@ describe('nInputScreen', () => {
     ['達人級', '200'],
   ])('fills the input from the %s preset', (name, n) => {
     const s = mount(3);
-    s.screen.querySelectorAll('.n-presets button').forEach((b) => {
-      if (b.querySelector('.challenge-btn__name')?.textContent === name) (b as HTMLButtonElement).click();
-    });
+    const preset = [...s.screen.querySelectorAll<HTMLButtonElement>('.n-presets button')].find(
+      (b) => b.querySelector('.challenge-btn__name')?.textContent === name,
+    );
+    if (!preset) throw new Error(`preset not found: ${name}`);
+    preset.click();
     expect(s.input.value).toBe(n);
     expect(s.hint()).toBe(`→ 地図の大きさ ${2 * Number(n) + 1} × ${2 * Number(n) + 1}`);
     expect(s.start.disabled).toBe(false);

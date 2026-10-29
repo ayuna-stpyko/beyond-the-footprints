@@ -32,7 +32,7 @@ export function titleScreen(actions: TitleActions, status: Partial<Record<Period
     h(
       'section.challenges',
       {},
-      h('div.challenges__label', {}, 'みんなで同じ盤面に挑戦'),
+      h('div.challenges__label', {}, '今日の地図に挑戦'),
       h(
         'div.challenges__row',
         {},

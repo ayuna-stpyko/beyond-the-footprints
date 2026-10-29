@@ -30,9 +30,9 @@ export interface GameActions {
  * 盤面の見出しの表示（チャレンジなら期間と挑戦回数、それ以外は N）。
  * 狭い画面では「ウィークリー」「10/19〜」「・2回目」の区切りでだけ折り返す
  */
-const boardTitle = (g: GameState, actions: GameActions, withMasu = false): (string | HTMLElement)[] => {
+const boardTitle = (g: GameState, actions: GameActions): (string | HTMLElement)[] => {
   const ch = actions.challenge;
-  if (!ch) return [boardLabel(g.board.n, withMasu)];
+  if (!ch) return [boardLabel(g.board.n)];
   const [name, ...rest] = ch.heading.split(' ');
   return [h('span.nowrap', {}, name), ' ', h('span.nowrap', {}, rest.join(' ')), h('span.nowrap', {}, `・${ch.attempt}回目`)];
 };
@@ -87,7 +87,7 @@ function hud() {
   const el = h(
     'section.hud.paper',
     {},
-    h('div.hud__row', {}, h('span.hud__label', {}, '残り歩数'), h('span.hud__count', {}, left, max)),
+    h('div.hud__row', {}, h('span.hud__label', {}, '残り体力'), h('span.hud__count', {}, left, max)),
     h('div.hud__bar', {}, fill),
   );
   const update = (g: GameState) => {
@@ -168,7 +168,7 @@ function resultCard(g: GameState, actions: GameActions, replay?: HTMLElement) {
     h(
       'div.result-card__msg',
       {},
-      (ch ? `${ch.attempt}回目の挑戦、` : '') + (won ? `${movesUsed(g)}歩で宝を見つけました。` : '歩数を使い切りました。'),
+      (ch ? `${ch.attempt}回目の挑戦、` : '') + (won ? `${movesUsed(g)}歩で宝を見つけました。` : '体力を使い切りました。'),
     ),
     shareButtons(g, actions.shareUrl, ch),
     h(
@@ -189,7 +189,7 @@ function titleButton(g: GameState, actions: GameActions, label: boolean) {
     if (actions.challenge || g.status !== 'playing' || movesUsed(g) === 0) return actions.title();
     openConfirm({
       title: 'タイトルへもどりますか？',
-      message: '遊んでいた盤面は保存されません。',
+      message: '遊んでいた地図は保存されません。',
       ok: 'タイトルへ',
       onOk: actions.title,
     });
@@ -205,8 +205,7 @@ function resetButton(g: GameState, actions: GameActions) {
     if (g.status !== 'playing' || movesUsed(g) === 0) return actions.restart();
     openConfirm({
       title: 'やりなおしますか？',
-      // チャレンジでは、動いたあとのやりなおしは次の挑戦に数える
-      message: actions.challenge ? `${actions.challenge.attempt + 1}回目の挑戦としてやりなおします。` : 'ここまでの移動はなくなります。',
+      message: '同じ地図で、最初からやりなおします。',
       ok: 'やりなおす',
       onOk: actions.restart,
     });
@@ -450,7 +449,7 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
       h(
         'aside.sidebar',
         {},
-        h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, ...boardTitle(game, actions, true))),
+        h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, ...boardTitle(game, actions))),
         h('div.actions', {}, helpLabelButton(openRules), reset, titleButton(game, actions, true)),
         h1.el,
         h(

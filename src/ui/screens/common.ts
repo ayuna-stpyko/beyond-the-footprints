@@ -7,8 +7,7 @@ export const MAX_N_MOBILE = 200;
 export const isMobile = () => window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 export const maxN = () => (isMobile() ? MAX_N_MOBILE : MAX_N_PC);
 
-export const boardLabel = (n: number, withMasu = false) =>
-  `N = ${n}（${2 * n + 1} × ${2 * n + 1}${withMasu ? ' マス' : ''}）`;
+export const boardLabel = (n: number) => `N = ${n}（${2 * n + 1} × ${2 * n + 1}）`;
 
 export function brand() {
   return h(

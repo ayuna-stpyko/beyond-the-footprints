@@ -98,7 +98,7 @@ async function startBoard(n: number, seed: number, shared = false, ch?: Challeng
     challenge = null;
   }
   const token = ++genToken;
-  mount(h('main.screen.loading-screen', {}, h('p.loading', {}, '盤面を生成中…')));
+  mount(h('main.screen.loading-screen', {}, h('p.loading', {}, '地図のほこりを払っています…')));
   const t0 = performance.now();
   // 共有リンクの盤面はシードを変えると別の盤面になるので、引き直さない
   const attempts = shared ? 1 : 1 + GEN_RETRIES;

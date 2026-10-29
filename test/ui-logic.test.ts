@@ -168,7 +168,6 @@ describe('shareText', () => {
 describe('boardLabel', () => {
   it('shows N and the board size', () => {
     expect(boardLabel(5)).toBe('N = 5（11 × 11）');
-    expect(boardLabel(5, true)).toBe('N = 5（11 × 11 マス）');
   });
 });
 

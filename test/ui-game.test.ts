@@ -191,7 +191,7 @@ describe.each([
     expect(g.status).toBe('lost');
     expect(text('.result-card__title')).toBe('ゲームオーバー');
     expect(q('.result-card__title--lost')).not.toBeNull();
-    expect(text('.result-card__msg')).toBe('歩数を使い切りました。');
+    expect(text('.result-card__msg')).toBe('体力を使い切りました。');
   });
 
   it('result card buttons call title and again', () => {
@@ -224,12 +224,12 @@ describe.each([
     expect(actions.title).toHaveBeenCalledTimes(1);
   });
 
-  it('tells that restarting a challenge counts as the next attempt', () => {
+  it('asks for confirmation with the same message during a challenge', () => {
     const g = newGame(generateBoard(3, 1));
     mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 2 } });
     pressKey(ARROW[safeDir(g)]);
     q('.pill--reset')!.click();
-    expect(text('.confirm__msg')).toBe('3回目の挑戦としてやりなおします。');
+    expect(text('.confirm__msg')).toBe('同じ地図で、最初からやりなおします。');
     // 開いたままだと次のテストのキー操作が効かなくなる
     buttonByText('キャンセル').click();
   });

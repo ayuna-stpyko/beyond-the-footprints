@@ -54,7 +54,7 @@ test('starts a game from the title screen', async ({ page }) => {
   await page.getByRole('button', { name: 'スタート' }).click();
   const input = page.getByRole('textbox', { name: 'N の値' });
   await input.fill('4');
-  await expect(page.getByText('→ 9 × 9 マス')).toBeVisible();
+  await expect(page.getByText('→ 地図の大きさ 9 × 9')).toBeVisible();
   await page.getByRole('button', { name: 'ゲーム開始' }).click();
   await expect(hudLeft(page)).toHaveText('48', { timeout: 30_000 });
   await expect(page.getByText('N = 4（9 × 9')).toBeVisible();
@@ -104,7 +104,7 @@ test('loses after using every move', async ({ page }) => {
   for (let i = 0; i < moveLimit(n); i++) await page.keyboard.press(i % 2 === 0 ? 'ArrowLeft' : 'ArrowRight');
 
   await expect(page.locator('.result-card__title')).toHaveText('ゲームオーバー');
-  await expect(page.getByText('歩数を使い切りました。')).toBeVisible();
+  await expect(page.getByText('体力を使い切りました。')).toBeVisible();
   // 終わったあとのキー入力では何も変わらない
   await page.keyboard.press('ArrowUp');
   await expect(hudLeft(page)).toHaveText('0');
@@ -139,7 +139,7 @@ test.describe('pc layout', () => {
 
   test('generates a large board in the worker without freezing the page', async ({ page }) => {
     await openBoard(page, 500, 7);
-    await expect(page.getByText('N = 500（1001 × 1001 マス）')).toBeVisible();
+    await expect(page.getByText('N = 500（1001 × 1001）')).toBeVisible();
     await page.keyboard.press('ArrowUp');
     await expect(hudLeft(page)).toHaveText(String(moveLimit(500) - 1));
   });

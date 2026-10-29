@@ -69,7 +69,7 @@ describe('nInputScreen', () => {
   it('shows the initial value and the board size hint', () => {
     const s = mount(3);
     expect(s.input.value).toBe('3');
-    expect(s.hint()).toBe('→ 7 × 7 マス');
+    expect(s.hint()).toBe('→ 地図の大きさ 7 × 7');
     expect(s.error()).toBe('');
     expect(s.start.disabled).toBe(false);
     expect(s.field.classList.contains('n-input--error')).toBe(false);
@@ -78,14 +78,14 @@ describe('nInputScreen', () => {
   it('updates the hint as the value changes', () => {
     const s = mount(3);
     s.type('10');
-    expect(s.hint()).toBe('→ 21 × 21 マス');
+    expect(s.hint()).toBe('→ 地図の大きさ 21 × 21');
   });
 
   it.each(['0', 'abc', '2001', '-1', '1.5'])('rejects %j', (v) => {
     const s = mount(3);
     s.type(v);
     expect(s.start.disabled).toBe(true);
-    expect(s.error()).toBe('1〜2000 の整数を入力してください');
+    expect(s.error()).toBe('1〜2000 の数字を入力してください');
     expect(s.field.classList.contains('n-input--error')).toBe(true);
     expect(s.hint()).toBe('');
   });
@@ -109,9 +109,24 @@ describe('nInputScreen', () => {
     const s = mount(3);
     s.type('５');
     expect(s.start.disabled).toBe(false);
-    expect(s.hint()).toBe('→ 11 × 11 マス');
+    expect(s.hint()).toBe('→ 地図の大きさ 11 × 11');
     s.start.click();
     expect(play).toHaveBeenCalledWith(5);
+  });
+
+  it.each([
+    ['初級', '5'],
+    ['中級', '15'],
+    ['上級', '50'],
+    ['達人級', '200'],
+  ])('fills the input from the %s preset', (name, n) => {
+    const s = mount(3);
+    s.screen.querySelectorAll('.n-presets button').forEach((b) => {
+      if (b.querySelector('.challenge-btn__name')?.textContent === name) (b as HTMLButtonElement).click();
+    });
+    expect(s.input.value).toBe(n);
+    expect(s.hint()).toBe(`→ 地図の大きさ ${2 * Number(n) + 1} × ${2 * Number(n) + 1}`);
+    expect(s.start.disabled).toBe(false);
   });
 
   it('calls play with the parsed number on Enter', () => {
@@ -171,7 +186,7 @@ describe('nInputScreen', () => {
     expect(s.start.disabled).toBe(true);
     expect(s.error()).toContain('スマホ');
     expect(s.error()).toContain('200');
-    expect(s.error()).toBe('1〜200 の整数を入力してください（スマホでは 200 まで）');
+    expect(s.error()).toBe('1〜200 の数字を入力してください（スマホでは 200 まで）');
     pressKey('Enter', {}, s.input);
     expect(play).not.toHaveBeenCalled();
   });
@@ -330,9 +345,9 @@ describe('openRules', () => {
     expect(modalOpen()).toBe(false);
   });
 
-  it('closes from the わかった button', () => {
+  it('closes from the 閉じる button', () => {
     openRules();
-    button('わかった').click();
+    button('閉じる').click();
     expect(modalOpen()).toBe(false);
   });
 
@@ -411,7 +426,7 @@ describe('genErrorScreen', () => {
 
   it.each([
     ['もう一度', 'retry'],
-    ['N を変える', 'changeN'],
+    ['地図の大きさを変える', 'changeN'],
     ['タイトルへ', 'title'],
   ] as const)('%s calls %s', (label, key) => {
     const actions = { retry: vi.fn<() => void>(), changeN: vi.fn<() => void>(), title: vi.fn<() => void>() };

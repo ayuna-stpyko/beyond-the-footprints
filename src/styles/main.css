@@ -398,6 +398,10 @@ img {
   margin: 0;
   line-height: 1.5;
 }
+.n-presets {
+  display: flex;
+  gap: 8px;
+}
 .n-input {
   display: flex;
   align-items: center;
@@ -514,7 +518,7 @@ img {
   color: var(--ink-sub);
   line-height: 1.3;
 }
-/* スマホは縦が足りないので、残り歩数の文字を小さくする（PC のサイドバーは別に指定） */
+/* スマホは縦が足りないので、残り体力の文字を小さくする（PC のサイドバーは別に指定） */
 @media (max-width: 1023px) {
   .hud__label,
   .hud__max {
@@ -560,7 +564,7 @@ img {
 .board-panel--explore .board-viewport {
   /*
    * 画面に収まるように、窓の高さは「画面の高さ - 窓以外の部分」にする（上限は 356px）。
-   * 334px は窓以外（ヘッダー・残り歩数・全体マップ/十字キー・余白）の高さの実測値。
+   * 334px は窓以外（ヘッダー・残り体力・全体マップ/十字キー・余白）の高さの実測値。
    * 200px を下回る低い画面（横向きなど）では、これ以上は縮めず、ページのスクロールで見る。
    */
   height: clamp(200px, calc(100dvh - 334px - env(safe-area-inset-top) - env(safe-area-inset-bottom)), 356px);

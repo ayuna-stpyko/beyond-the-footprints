@@ -1031,6 +1031,12 @@ img {
   width: 20.5px;
   height: 20.5px;
 }
+.rules__credit {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-sub);
+}
 
 /* ===== 確認モーダル ===== */
 .overlay:has(.confirm) {

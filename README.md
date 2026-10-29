@@ -2,6 +2,9 @@
 
 探検家の足跡を手がかりに、宝への近道を見つけるパズルゲーム。
 
+[![Deploy](https://github.com/ayuna-stpyko/beyond-the-footprints/actions/workflows/deploy.yml/badge.svg)](https://github.com/ayuna-stpyko/beyond-the-footprints/actions/workflows/deploy.yml)
+[![Play on GitHub Pages](https://img.shields.io/badge/Play-GitHub%20Pages-2ea44f?logo=github)](https://ayuna-stpyko.github.io/beyond-the-footprints/)
+
 原案: [ICPC 2024 Asia Yokohama Regional](https://icpc.jp/2024/regional/) のG問題「Beyond the Former Explorer」。
 
 ## 遊び方
@@ -38,3 +41,4 @@ npm run stats   # 盤面生成の統計
 ```
 
 - main への push と PR で、CI が型チェック・lint・テスト・E2E を実行する。
+- main への push で、GitHub Pages にデプロイされる。

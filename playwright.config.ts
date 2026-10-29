@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 /** E2E 用のプレビューサーバーのポート（開発サーバーとぶつからない番号） */
 const PORT = 4179;
 /** vite.config.ts の base と同じ（GitHub Pages のリポジトリ名） */
-const BASE_PATH = '/beyond-footprints/';
+const BASE_PATH = '/beyond-the-footprints/';
 
 export default defineConfig({
   testDir: 'e2e',

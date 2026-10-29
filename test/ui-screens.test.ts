@@ -341,6 +341,14 @@ describe('openRules', () => {
     expect(modalOpen()).toBe(true);
   });
 
+  it('credits the original ICPC problem and gifenc', () => {
+    openRules();
+    const [icpc, gifenc] = document.querySelectorAll('.rules__credit');
+    expect(icpc.textContent).toContain('ICPC 2024 Asia Yokohama Regional G問題');
+    expect(gifenc.textContent).toContain('gifenc');
+    expect(gifenc.textContent).toContain('MIT License');
+  });
+
   it('closes from the close button', () => {
     openRules();
     $('.rules__close').click();

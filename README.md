@@ -2,6 +2,8 @@
 
 探検家の足跡を手がかりに、宝への近道を見つけるパズルゲーム。
 
+原案: [ICPC 2024 Asia Yokohama Regional](https://icpc.jp/2024/regional/) のG問題「Beyond the Former Explorer」。
+
 ## 遊び方
 
 - 盤面のまんなかから出発し、上下左右に1マスずつ動くことができる（PCは矢印キーでも操作できる）。

@@ -49,6 +49,8 @@ export function openRules() {
     rule(domCell('nothing'), '矢印がなかったところは、探検家が通らなかったようです。'),
     rule(domCell('treasure'), '宝はこの地図のどこかに1つだけ隠されています。体力が尽きるまでに見つけられなければ、ゲームオーバー。'),
     rule(domCell('found'), '体力が尽きる前に宝を見つければクリア！'),
+    h('p.rules__credit', {}, '原案: ICPC 2024 Asia Yokohama Regional G問題'),
+    h('p.rules__credit', {}, 'GIF の作成に gifenc（© 2017 Matt DesLauriers, MIT License）を使用しています。'),
     h('button.btn.btn--primary.btn--full', { onclick: close }, '閉じる'),
   );
   open = h('div.overlay', {

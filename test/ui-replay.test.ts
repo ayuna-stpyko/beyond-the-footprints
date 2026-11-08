@@ -3,8 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GameState, move, newGame } from '../src/core/game';
 import { generateBoard } from '../src/core/generate';
 import { DC, DR, Dir } from '../src/core/types';
-import { replayPlayer } from '../src/ui/replayPlayer';
+import { FX } from '../src/ui/endFx';
+import * as replay from '../src/ui/replay';
+import { SPARKLE_TICK_MS, replayPlayer } from '../src/ui/replayPlayer';
 import { setupDom } from './helpers/dom';
+import { wonGame } from './helpers/game';
+
+// きらめきを描いたかどうかを見るため、その関数だけ差し替える（リプレイの描画はそのまま）
+vi.mock('../src/ui/replay', async (importOriginal) => ({
+  ...(await importOriginal<typeof replay>()),
+  paintReplaySparkles: vi.fn(),
+}));
+const { paintReplaySparkles } = replay;
 
 /** 再生し終えるのに十分な時間（正確な間隔・合計時間はここでは問わない） */
 const LONG_MS = 20_000;
@@ -153,5 +163,60 @@ describe('replayPlayer', () => {
     vi.advanceTimersByTime(LONG_MS);
     expect(label()).toBe(shown);
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('replayPlayer sparkles', () => {
+  const [from, to] = FX.won.sparkle!;
+
+  beforeEach(() => vi.mocked(paintReplaySparkles).mockClear());
+
+  it('sparkles on the treasure after playing a cleared game to the end', () => {
+    const { playBtn, step } = mount(wonGame());
+    playBtn.click();
+    vi.advanceTimersByTime(LONG_MS);
+    expect(step()).toBe(wonGame().log.length - 1);
+    const alphas = vi.mocked(paintReplaySparkles).mock.calls.map((c) => c[3]);
+    // 光って消える（区間の長さぶんのコマ）
+    expect(alphas.length).toBe(Math.ceil((to - from) / SPARKLE_TICK_MS) - 1);
+    expect(Math.max(...alphas)).toBeGreaterThan(0.9);
+    // 終わったらタイマーも残っていない
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not sparkle before reaching the end or after a loss', () => {
+    mount(wonGame());
+    vi.advanceTimersByTime(LONG_MS);
+    const lost = mount(game);
+    lost.playBtn.click();
+    vi.advanceTimersByTime(LONG_MS);
+    expect(paintReplaySparkles).not.toHaveBeenCalled();
+  });
+
+  it('stops sparkling when played again, moved, or disposed', () => {
+    const g = wonGame();
+    const { player, playBtn, range, playing } = mount(g);
+    playBtn.click();
+    // 再生しきって、きらめきの途中まで進める
+    while (!vi.mocked(paintReplaySparkles).mock.calls.length) vi.advanceTimersByTime(SPARKLE_TICK_MS);
+    vi.advanceTimersByTime(SPARKLE_TICK_MS * 5);
+    playBtn.click();
+    expect(playing()).toBe(true);
+    const afterPlay = vi.mocked(paintReplaySparkles).mock.calls.length;
+    vi.advanceTimersByTime(500);
+    expect(vi.mocked(paintReplaySparkles).mock.calls.length).toBe(afterPlay);
+
+    range.value = '0';
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    player.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('skips the sparkles when reduced motion is preferred', () => {
+    setupDom({ reducedMotion: true });
+    const { playBtn } = mount(wonGame());
+    playBtn.click();
+    vi.advanceTimersByTime(LONG_MS);
+    expect(paintReplaySparkles).not.toHaveBeenCalled();
   });
 });

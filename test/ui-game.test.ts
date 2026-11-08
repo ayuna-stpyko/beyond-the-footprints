@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GameState, newGame } from '../src/core/game';
 import { generateBoard } from '../src/core/generate';
 import { DC, DR, Dir, isMoveDir } from '../src/core/types';
+import { FX_MAX_MS, fxTimeline } from '../src/ui/endFx';
 import { makeReplayGif } from '../src/ui/gif';
-import { type GameActions, gameScreen } from '../src/ui/screens/game';
+import { type GameActions, gameScreen, treasureText } from '../src/ui/screens/game';
 import { openConfirm } from '../src/ui/screens/confirm';
 import { pressKey, setupDom } from './helpers/dom';
 
@@ -36,13 +37,23 @@ function safeDir(g: GameState): MoveDir {
 /** 矢印をたどれば 12N 歩以内に宝に着く盤面（test/game.test.ts と同じ） */
 const winnableGame = () => newGame(generateBoard(1, 5));
 
-/** 矢印をたどってキー入力で宝まで歩く */
-function walkToTreasure(g: GameState) {
+/** 終了演出を最後まで進める（偽のタイマーを使っているテストで呼ぶ） */
+const finishEndFx = () => vi.advanceTimersByTime(FX_MAX_MS);
+
+/** 矢印をたどってキー入力で宝まで歩く。fx: false なら終了演出の途中で止める */
+function walkToTreasure(g: GameState, fx = true) {
   while (g.status === 'playing') {
     const d = g.board.dirs[g.pos];
     if (!isMoveDir(d)) throw new Error('walked off the route');
     pressKey(ARROW[d]);
   }
+  if (fx) finishEndFx();
+}
+
+/** 残り 1 歩にして宝のない向きへ動き、ゲームオーバーにする */
+function loseByLastMove(g: GameState) {
+  g.movesLeft = 1;
+  return g;
 }
 
 /** 中央から真上の列に宝がない盤面（上端まで行って盤外へ動ける） */
@@ -93,8 +104,11 @@ afterEach(() => {
 describe.each([
   { name: 'mobile', media: {} },
   { name: 'pc', media: { pc: true } },
-])('gameScreen ($name)', ({ media }) => {
-  beforeEach(() => setupDom(media));
+])('gameScreen ($name)', ({ name, media }) => {
+  beforeEach(() => {
+    setupDom(media);
+    vi.useFakeTimers();
+  });
 
   it('moves with arrow keys and updates the HUD', () => {
     const g = newGame(generateBoard(3, 1));
@@ -183,15 +197,50 @@ describe.each([
   });
 
   it('shows game over after running out of moves', () => {
-    const g = newGame(generateBoard(1, 5));
-    // 残り 1 歩にして、宝のない向きへ動く
-    g.movesLeft = 1;
+    const g = loseByLastMove(newGame(generateBoard(1, 5)));
     mount(g);
     pressKey(ARROW[safeDir(g)]);
     expect(g.status).toBe('lost');
+    finishEndFx();
     expect(text('.result-card__title')).toBe('ゲームオーバー');
     expect(q('.result-card__title--lost')).not.toBeNull();
     expect(text('.result-card__msg')).toBe('体力を使い切りました。');
+    expect(text('.result-card__hint')).toBe(treasureText(g));
+  });
+
+  it('shows the result only after the treasure effect', () => {
+    const g = winnableGame();
+    mount(g);
+    walkToTreasure(g, false);
+    expect(g.status).toBe('won');
+    vi.advanceTimersByTime(fxTimeline('won').total - 1);
+    expect(q('.result-card')).toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(text('.result-card__title')).toBe('クリア！');
+    // クリアでは宝の位置の一言は出さない
+    expect(q('.result-card__hint')).toBeNull();
+  });
+
+  it('waits for the camera move to the treasure on game over', () => {
+    const g = loseByLastMove(newGame(generateBoard(1, 5)));
+    mount(g);
+    pressKey(ARROW[safeDir(g)]);
+    // PC は見回し表示なので宝までカメラを動かす（画面の大きさが 0 なので最短の長さ）。
+    // スマホの小さい盤面は全体が見えているので動かさず、そのぶん早く結果が出る
+    const wait = name === 'pc' ? fxTimeline('lost').total : fxTimeline('lost', 0).total;
+    vi.advanceTimersByTime(wait - 1);
+    expect(q('.result-card')).toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(text('.result-card__title')).toBe('ゲームオーバー');
+  });
+
+  it('does not show the result after dispose during the effect', () => {
+    const g = winnableGame();
+    const { root, dispose } = mount(g);
+    walkToTreasure(g, false);
+    dispose();
+    finishEndFx();
+    expect(root.querySelector('.result-card')).toBeNull();
   });
 
   it('result card buttons call title and again', () => {
@@ -235,10 +284,10 @@ describe.each([
   });
 
   it('retries a lost challenge on the same board', () => {
-    const g = newGame(generateBoard(1, 5));
-    g.movesLeft = 1;
+    const g = loseByLastMove(newGame(generateBoard(1, 5)));
     const { actions } = mount(g, { challenge: { title: 'デイリー 2026/10/21', heading: 'デイリー 10/21', attempt: 1 } });
     pressKey(ARROW[safeDir(g)]);
+    finishEndFx();
     buttonByText('もう一度挑戦').click();
     expect(actions.restart).toHaveBeenCalledTimes(1);
     expect(actions.again).not.toHaveBeenCalled();
@@ -363,7 +412,29 @@ describe.each([
 });
 
 describe('gameScreen (mobile)', () => {
-  beforeEach(() => setupDom());
+  beforeEach(() => {
+    setupDom();
+    vi.useFakeTimers();
+  });
+
+  it('keeps the board until the treasure effect ends', () => {
+    const g = winnableGame();
+    mount(g);
+    walkToTreasure(g, false);
+    // 演出中は盤面のまま（リプレイに切り替えると演出が見えない）
+    expect(q('.board-panel--replay')).toBeNull();
+    expect(q('.board-viewport')).not.toBeNull();
+    finishEndFx();
+    expect(q('.board-panel--replay .replay')).not.toBeNull();
+  });
+
+  it('skips the effect when reduced motion is preferred', () => {
+    setupDom({ reducedMotion: true });
+    const g = winnableGame();
+    mount(g);
+    walkToTreasure(g, false);
+    expect(text('.result-card__title')).toBe('クリア！');
+  });
 
   it('uses fit mode with a d-pad for small boards', () => {
     mount(newGame(generateBoard(3, 1)));

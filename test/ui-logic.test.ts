@@ -4,6 +4,8 @@ import { nRange } from '../src/analytics';
 import { type GameState, newGame } from '../src/core/game';
 import { generateBoard } from '../src/core/generate';
 import { Dir } from '../src/core/types';
+import { CellLook, paintCell } from '../src/ui/cellPainter';
+import { COLORS, MIN_DETAIL_CELL_PX } from '../src/ui/constants';
 import { replayTiming } from '../src/ui/replayPlayer';
 import { boardLabel } from '../src/ui/screens/common';
 import {
@@ -68,6 +70,24 @@ describe('treasureText', () => {
     const { n, size } = g.board;
     g.board = { ...g.board, treasure: (n + 3) * size + (n + 4) };
     expect(treasureText(g)).toBe('宝は スタートから右4・下3 にありました。');
+  });
+});
+
+/** 細かく描けない小ささのマスを塗ったときの色 */
+function fillColor(look: CellLook, player: boolean) {
+  const ctx = { fillStyle: '', fillRect: () => {} };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  paintCell(ctx as unknown as CanvasRenderingContext2D, 0, 0, MIN_DETAIL_CELL_PX - 1, look, 0, player);
+  return ctx.fillStyle;
+}
+
+describe('paintCell (cells too small for details)', () => {
+  it('paints the treasure gold so it differs from the current position (red)', () => {
+    expect(fillColor(CellLook.Treasure, false)).toBe(COLORS.gold);
+    expect(fillColor(CellLook.Found, false)).toBe(COLORS.gold);
+    expect(fillColor(CellLook.Empty, true)).toBe(COLORS.red);
+    expect(fillColor(CellLook.Arrow, true)).toBe(COLORS.red);
+    expect(fillColor(CellLook.Arrow, false)).toBe(COLORS.arrow);
   });
 });
 

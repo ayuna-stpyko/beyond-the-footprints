@@ -14,10 +14,26 @@ const RADIUS_RATIO = 0.04;
 /** マスがこれより小さいときは軌跡の線で描く */
 const MIN_CELL_PX = 6;
 
-/** 一辺 px の画像に、盤面のどの範囲をどの大きさで描くか */
+/** 軌跡を線で描くときの太さ（画像の一辺に対する割合と下限） */
+const TRAIL_WIDTH_RATIO = 1 / 120;
+const TRAIL_MIN_WIDTH_PX = 2;
+
+/**
+ * 一辺 px の画像に、盤面のどの範囲をどの大きさで描くか。
+ * - 大きい盤面（全体を描くとマスが細かく描けない）: 盤面全体を描く。
+ *   スタート・宝・現在地が盤面のどこにあるかが分かるように
+ * - 小さい盤面: 歩いた範囲と宝が収まるところを切り出して大きく描く
+ */
 function replayLayout(game: GameState, px: number) {
   const { board, log } = game;
   const { size } = board;
+  const pad = px * PAD_RATIO;
+  const pitchOf = (span: number) => (px - 2 * pad) / (span - GAP_RATIO);
+
+  if (pitchOf(size) * CELL_RATIO < MIN_CELL_PX) {
+    const pitch = pitchOf(size);
+    return { r0: 0, c0: 0, span: size, pad, pitch, cell: pitch * CELL_RATIO };
+  }
 
   // 切り出し範囲: 軌跡と宝の外接矩形 + 1 マスの余白を正方形にする（最小 7 マス）
   let rMin = size, rMax = -1, cMin = size, cMax = -1;
@@ -33,10 +49,8 @@ function replayLayout(game: GameState, px: number) {
   const r0 = clamp(Math.round((rMin + rMax) / 2 - span / 2 + 0.5), 0, size - span);
   const c0 = clamp(Math.round((cMin + cMax) / 2 - span / 2 + 0.5), 0, size - span);
 
-  const pad = px * PAD_RATIO;
-  const pitch = (px - 2 * pad) / (span - GAP_RATIO);
-  const cell = pitch * CELL_RATIO;
-  return { r0, c0, span, pad, pitch, cell };
+  const pitch = pitchOf(span);
+  return { r0, c0, span, pad, pitch, cell: pitch * CELL_RATIO };
 }
 
 /**
@@ -120,7 +134,7 @@ function drawReplayMap(
   ctx.fillRect(pad, pad, span * pitch, span * pitch);
 
   ctx.strokeStyle = COLORS.red;
-  ctx.lineWidth = Math.max(1.5, px / 160);
+  ctx.lineWidth = Math.max(TRAIL_MIN_WIDTH_PX, px * TRAIL_WIDTH_RATIO);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();

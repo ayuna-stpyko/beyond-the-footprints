@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { type Page, test as base, expect } from '@playwright/test';
 import { generateBoard } from '../src/core/generate';
 import { moveLimit } from '../src/core/game';
+import { FX_MAX_MS } from '../src/ui/endFx';
 import type { Board } from '../src/core/types';
 import { GameInteractor, type Interactor, solve } from '../scripts/solve';
 
@@ -103,7 +104,8 @@ test('loses after using every move', async ({ page }) => {
   // oxlint-disable-next-line no-await-in-loop
   for (let i = 0; i < moveLimit(n); i++) await page.keyboard.press(i % 2 === 0 ? 'ArrowLeft' : 'ArrowRight');
 
-  await expect(page.locator('.result-card__title')).toHaveText('ゲームオーバー');
+  // 結果は、宝までカメラを動かす演出（縮小 → 移動 → 拡大）のあとに出るので長めに待つ
+  await expect(page.locator('.result-card__title')).toHaveText('ゲームオーバー', { timeout: FX_MAX_MS + 2000 });
   await expect(page.getByText('体力を使い切りました。')).toBeVisible();
   // 終わったあとのキー入力では何も変わらない
   await page.keyboard.press('ArrowUp');

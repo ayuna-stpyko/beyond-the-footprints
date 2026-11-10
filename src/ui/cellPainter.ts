@@ -34,12 +34,14 @@ export function paintCell(
   // 以下の座標・寸法は Figma の 44px のマスでの値。k 倍して s に合わせる
   const k = s / CELL_PX;
 
-  // 細かすぎるときは塗りだけ
+  // 細かすぎるときは塗りだけ。宝は現在地（赤）と見分けがつくよう、全体マップと同じ金色にする
   if (s < MIN_DETAIL_CELL_PX) {
     ctx.fillStyle =
-      player || look === CellLook.Found || look === CellLook.Treasure
-        ? COLORS.red
-        : look === CellLook.Arrow
+      look === CellLook.Found || look === CellLook.Treasure
+        ? COLORS.gold
+        : player
+          ? COLORS.red
+          : look === CellLook.Arrow
           ? COLORS.arrow
           : look === CellLook.Nothing
             ? COLORS.nothing

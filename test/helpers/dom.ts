@@ -20,10 +20,21 @@ export function stubCanvas() {
   );
 }
 
-/** matchMedia を固定する。mobile: スマホ判定（hover: none / pointer: coarse）、pc: 幅 1024px 以上 */
-export function mockMedia(opts: { mobile?: boolean; pc?: boolean } = {}) {
+type MediaOpts = { mobile?: boolean; pc?: boolean; reducedMotion?: boolean };
+
+/**
+ * matchMedia を固定する。mobile: スマホ判定（hover: none / pointer: coarse）、pc: 幅 1024px 以上、
+ * reducedMotion: 動きを減らす設定
+ */
+export function mockMedia(opts: MediaOpts = {}) {
   vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => {
-    const matches = query.includes('pointer: coarse') ? !!opts.mobile : query.includes('min-width: 1024px') ? !!opts.pc : false;
+    const matches = query.includes('pointer: coarse')
+      ? !!opts.mobile
+      : query.includes('min-width: 1024px')
+        ? !!opts.pc
+        : query.includes('prefers-reduced-motion: reduce')
+          ? !!opts.reducedMotion
+          : false;
     return {
       matches,
       media: query,
@@ -37,7 +48,7 @@ export function mockMedia(opts: { mobile?: boolean; pc?: boolean } = {}) {
   });
 }
 
-export function setupDom(media: { mobile?: boolean; pc?: boolean } = {}) {
+export function setupDom(media: MediaOpts = {}) {
   document.body.replaceChildren();
   stubCanvas();
   mockMedia(media);

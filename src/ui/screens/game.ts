@@ -99,15 +99,24 @@ function hud() {
   return { el, update };
 }
 
-/** 現在地の表示（スタートからの相対位置）。long で「スタートから」を付ける */
-export function positionText(g: GameState, long: boolean) {
-  const { right, up } = offsetFromStart(g.board, g.pos);
-  if (right === 0 && up === 0) return 'スタート地点';
+/** マスのスタートからの相対位置（「右3・上2」など）。スタート地点なら空文字 */
+function offsetLabel(board: GameState['board'], cell: number) {
+  const { right, up } = offsetFromStart(board, cell);
   const parts: string[] = [];
   if (right) parts.push(`${right > 0 ? '右' : '左'}${Math.abs(right)}`);
   if (up) parts.push(`${up > 0 ? '上' : '下'}${Math.abs(up)}`);
-  return (long ? 'スタートから ' : '') + parts.join('・');
+  return parts.join('・');
 }
+
+/** 現在地の表示（スタートからの相対位置）。long で「スタートから」を付ける */
+export function positionText(g: GameState, long: boolean) {
+  const label = offsetLabel(g.board, g.pos);
+  if (!label) return 'スタート地点';
+  return (long ? 'スタートから ' : '') + label;
+}
+
+/** ゲームオーバーで見せる宝の位置（現在地バッジと同じくスタートから数える） */
+export const treasureText = (g: GameState) => `宝は スタートから${offsetLabel(g.board, g.board.treasure)} にありました。`;
 
 function positionBadge() {
   const value = h('span.pos-badge__value');
@@ -170,6 +179,7 @@ function resultCard(g: GameState, actions: GameActions, replay?: HTMLElement) {
       {},
       (ch ? `${ch.attempt}回目の挑戦、` : '') + (won ? `${movesUsed(g)}歩で宝を見つけました。` : '体力を使い切りました。'),
     ),
+    won ? null : h('div.result-card__hint', {}, treasureText(g)),
     shareButtons(g, actions.shareUrl, ch),
     h(
       'div.result-card__actions',
@@ -297,13 +307,9 @@ function controller(
     view.follow();
     refresh();
     if (game.status !== 'playing') {
-      if (game.status === 'lost') {
-        const { size } = game.board;
-        if (view.mode === 'explore') view.centerOn((game.board.treasure % size) + 0.5, Math.floor(game.board.treasure / size) + 0.5);
-      }
-      view.requestDraw();
       trackEnd(game);
-      onEnd();
+      // 宝のマスを強調する演出が終わってから結果を出す（ゲームオーバーなら宝までカメラを動かす）
+      view.playEndFx(game.status, onEnd);
     }
   };
   const onKey = (e: KeyboardEvent) => {

@@ -1,7 +1,8 @@
 import type { GameState } from '../core/game';
 import { icons } from './assets';
 import { h, img } from './dom';
-import { drawReplayFrame } from './replay';
+import { FX, reducedMotion, sparkleAlpha } from './endFx';
+import { drawReplayFrame, paintReplaySparkles } from './replay';
 
 /** つまみの直径（main.css の .scrub__knob と対応） */
 const KNOB_PX = 26;
@@ -12,6 +13,8 @@ const REPLAY_TOTAL_MS = 6000;
 /** 1 コマの間隔の下限（約 60fps）と上限 */
 const MIN_TICK_MS = 16;
 const MAX_TICK_MS = 300;
+/** クリアした再生の最後に出すきらめきのコマの間隔（約 30fps） */
+export const SPARKLE_TICK_MS = 33;
 
 /**
  * 再生の速さ。interval ミリ秒ごとに perTick 歩進める。
@@ -52,19 +55,44 @@ export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boo
     range.value = String(step);
     label.textContent = `${step} / ${last}歩`;
   };
+  /** 最後まで再生したクリアのリプレイで、宝のまわりにきらめきを出す（ゲーム中・GIF と同じ） */
+  let sparkleTimer = 0;
+  const stopSparkle = () => {
+    if (!sparkleTimer) return;
+    clearInterval(sparkleTimer);
+    sparkleTimer = 0;
+    drawReplayFrame(ctx, game, step, px);
+  };
+  const sparkle = () => {
+    const span = FX.won.sparkle;
+    if (game.status !== 'won' || !span || reducedMotion()) return;
+    let t = span[0];
+    sparkleTimer = window.setInterval(() => {
+      t += SPARKLE_TICK_MS;
+      if (t >= span[1]) return stopSparkle();
+      drawReplayFrame(ctx, game, last, px);
+      paintReplaySparkles(ctx, game, px, sparkleAlpha('won', t));
+    }, SPARKLE_TICK_MS);
+  };
   const stop = () => {
     clearInterval(timer);
     timer = 0;
+    stopSparkle();
     playBtn.classList.remove('play-btn--pause');
     playBtn.replaceChildren(img(icons.iconPlay));
   };
   const play = () => {
+    stopSparkle();
     if (step >= last) show(0);
     playBtn.classList.add('play-btn--pause');
     playBtn.replaceChildren();
     const { interval, perTick } = replayTiming(last);
     timer = window.setInterval(() => {
-      if (step >= last) return stop();
+      if (step >= last) {
+        stop();
+        sparkle();
+        return;
+      }
       show(Math.min(last, step + perTick));
     }, interval);
   };

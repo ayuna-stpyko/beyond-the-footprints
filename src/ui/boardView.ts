@@ -3,6 +3,23 @@ import { CellLook, paintCell, paintStartMark } from './cellPainter';
 import { COLORS, GAP_RATIO, MIN_DETAIL_CELL_PX, PITCH_PX, redAlpha } from './constants';
 import { centerIndex } from '../core/types';
 import { h } from './dom';
+import {
+  type EndKind,
+  type FxTimeline,
+  bounceAt,
+  cameraPhase,
+  fxTimeline,
+  paintGlow,
+  paintRipple,
+  paintSparkles,
+  PRE_RIPPLE_STRENGTH,
+  panDuration,
+  preRippleProgress,
+  reducedMotion,
+  zoomDuration,
+  rippleProgress,
+  sparkleAlpha,
+} from './endFx';
 
 const FIT_PAD = 8;
 /** 拡大の上限。縮小は盤面全体が収まる倍率まで */
@@ -12,8 +29,35 @@ const WHEEL_ZOOM_SPEED = 0.015;
 /** 現在地を追いかけるとき、画面の端から空けておくマス数（狭い画面では画面幅の 1/4 まで） */
 const FOLLOW_MARGIN_CELLS = 2.5;
 const FOLLOW_MARGIN_MAX_RATIO = 1 / 4;
+/**
+ * 宝まで遠いときは、移動の前に（現在地を画面の中央にしたまま）縮小して、
+ * 宝が画面の中央から端までのこの割合以内に見えるようにする
+ */
+const PAN_KEEP_RATIO = 0.8;
+/**
+ * 演出中に引ける下限（「全体を表示」の倍率に対する割合）。
+ * 現在地が盤面の端にあると、全体を表示する倍率では反対側の宝が画面に入らないため
+ */
+const FX_MIN_ZOOM_OF_FIT = 0.4;
+/** 宝に着いたときの倍率の下限（これより引いて見ていたら、ここまで寄る） */
+const FX_ARRIVE_ZOOM = 1;
+/** 宝が画面に見えているとみなすには、画面の端からこのマス数以上内側にあること */
+const IN_VIEW_MARGIN_CELLS = 1;
+/** 宝の光がはっきりするまでの時間 */
+const GLOW_IN_MS = 300;
 
 export type ViewMode = 'fit' | 'explore';
+
+/** 終了演出の状態。カメラは zMid まで縮小 → from から to へ移動 → zEnd まで拡大 */
+interface EndFxState {
+  timeline: FxTimeline;
+  start: number;
+  from: { x: number; y: number; zoom: number };
+  to: { x: number; y: number };
+  zMid: number;
+  zEnd: number;
+  panDone: boolean;
+}
 
 /**
  * 盤面を canvas に描くビュー。
@@ -38,6 +82,8 @@ export class BoardView {
   private ro: ResizeObserver;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchDist = 0;
+  private fx: EndFxState | null = null;
+  private fxTimer = 0;
   onViewChange: () => void = () => {};
 
   constructor(
@@ -65,6 +111,108 @@ export class BoardView {
   destroy() {
     this.ro.disconnect();
     cancelAnimationFrame(this.raf);
+    window.clearTimeout(this.fxTimer);
+    this.fx = null;
+  }
+
+  // ---------- 終了演出 ----------
+
+  /**
+   * 宝のマスを強調する演出を流し、終わったら onDone を呼ぶ。
+   * ゲームオーバーで見回しているときは、先に宝の位置までカメラを動かす。
+   * 動きを減らす設定のときは、カメラだけ宝へ移してすぐ onDone を呼ぶ。
+   */
+  playEndFx(kind: EndKind, onDone: () => void) {
+    const { size, treasure } = this.game.board;
+    const tx = (treasure % size) + 0.5;
+    const ty = Math.floor(treasure / size) + 0.5;
+    // 「全体を表示」中も、宝へ動いて寄る（宝は見えているので縮小はしない）
+    const pan = kind === 'lost' && this.mode === 'explore';
+    if (reducedMotion()) {
+      if (pan) this.centerOn(tx, ty);
+      else this.requestDraw();
+      onDone();
+      return;
+    }
+    const from = { x: this.camX, y: this.camY, zoom: this.zoom };
+    const to = pan ? { x: tx, y: ty } : { x: this.camX, y: this.camY };
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const view = Math.min(this.w, this.h);
+    const fitDist = ((view / 2) * PAN_KEEP_RATIO) / PITCH_PX;
+    // 宝がもう画面に見えていれば縮小しない。見えていなければ、現在地を中央にしたまま宝まで見えるよう縮小する
+    // （演出中だけは「全体を表示」より引いてもよい。画面の大きさがまだ分からないときは縮小しない）
+    const zMid =
+      dist > 0 && view > 0 && !this.inView(tx, ty)
+        ? Math.max(this.fitZoom * FX_MIN_ZOOM_OF_FIT, Math.min(from.zoom, fitDist / dist))
+        : from.zoom;
+    // 着いたら宝がよく見えるよう、元の倍率が小さければ 100% まで寄る
+    const zEnd = Math.max(from.zoom, FX_ARRIVE_ZOOM);
+    // 縮小・拡大は倍率の差（何段階引く・寄るか）で、移動は縮小したあとの倍率で宝が画面何枚分かで長さを決める
+    // （まだ画面の大きさが分からないときは最短）
+    const screens = view > 0 ? (dist * PITCH_PX * zMid) / view : 0;
+    const timeline = pan
+      ? fxTimeline(kind, panDuration(screens), zoomDuration(from.zoom / zMid), zoomDuration(zEnd / zMid))
+      : fxTimeline(kind, 0);
+    this.fx = { timeline, start: performance.now(), from, to, zMid, zEnd, panDone: !pan };
+    this.fxTimer = window.setTimeout(() => {
+      this.fxTimer = 0;
+      this.fx = null;
+      this.requestDraw();
+      onDone();
+    }, timeline.total);
+    this.requestDraw();
+  }
+
+  /**
+   * 演出中のカメラを動かす。遠いときは「縮小 → 移動 → 拡大」の順に 1 つずつ行う。
+   * 終わったら、あとはドラッグなどで自由に動かせる
+   */
+  private stepFxCamera(fx: EndFxState, elapsed: number) {
+    if (fx.panDone) return;
+    const { from, to, zMid, zEnd, timeline } = fx;
+    const { zoomOut, move, zoomIn } = cameraPhase(timeline, elapsed);
+    this.camX = from.x + (to.x - from.x) * move;
+    this.camY = from.y + (to.y - from.y) * move;
+    // 倍率は比で変える（等比）と、縮小・拡大の速さが均一に見える
+    this.zoom = zoomIn > 0 ? zMid * (zEnd / zMid) ** zoomIn : from.zoom * (zMid / from.zoom) ** zoomOut;
+    if (elapsed >= timeline.arrive) {
+      this.camX = to.x;
+      this.camY = to.y;
+      this.zoom = zEnd;
+      // 寄ったので「全体を表示」の状態ではなくなる（リサイズで全体に戻さない）
+      this.fitted = this.zoom === this.fitZoom;
+      fx.panDone = true;
+    }
+    this.clampCamera();
+  }
+
+  /** 宝のマスの上に、光・跳ねる宝・波紋・きらめきを重ねる */
+  private drawFx(fx: EndFxState, elapsed: number, ox: number, oy: number, p: number, s: number) {
+    const { ctx } = this;
+    const { kind } = fx.timeline;
+    const { size, treasure } = this.game.board;
+    const x = ox + (treasure % size) * p;
+    const y = oy + Math.floor(treasure / size) * p;
+    const cx = x + s / 2;
+    const cy = y + s / 2;
+    const detailed = s >= MIN_DETAIL_CELL_PX;
+    const look = kind === 'won' ? CellLook.Found : CellLook.Treasure;
+
+    // 宝に着いてからの時間（クリアは最初から着いている）。光・波紋などはこれで決める
+    const since = elapsed - fx.timeline.arrive;
+    const glow = Math.min(1, Math.max(0, since / GLOW_IN_MS)) * (kind === 'won' ? 1 : 0.5);
+    paintGlow(ctx, cx, cy, s, glow);
+    if (detailed) {
+      // 光の上に宝のマスを描き直す（跳ねている間は大きく、少し上に）
+      const b = bounceAt(kind, since);
+      const k = b?.scale ?? 1;
+      const big = s * k;
+      paintCell(ctx, x - (big - s) / 2, y - (big - s) / 2 - (b?.lift ?? 0) * s, big, look, 0, false);
+    }
+    // 着く前（カメラ移動中）は細く薄い波紋で行き先を示し、着いてからの波紋で強調する
+    for (const r of preRippleProgress(fx.timeline, elapsed)) paintRipple(ctx, cx, cy, s, r, PRE_RIPPLE_STRENGTH);
+    for (const r of rippleProgress(kind, since)) paintRipple(ctx, cx, cy, s, r);
+    paintSparkles(ctx, cx, cy, s, sparkleAlpha(kind, since));
   }
 
   // ---------- カメラ ----------
@@ -154,6 +302,13 @@ export class BoardView {
       w: this.w / p,
       h: this.h / p,
     };
+  }
+
+  /** マス座標 (x, y) が、画面の端から少し内側の範囲に見えているか */
+  private inView(x: number, y: number) {
+    const r = this.visibleRect();
+    const m = IN_VIEW_MARGIN_CELLS;
+    return x >= r.x + m && x <= r.x + r.w - m && y >= r.y + m && y <= r.y + r.h - m;
   }
 
   private screenToCell(sx: number, sy: number) {
@@ -250,7 +405,9 @@ export class BoardView {
   }
 
   draw() {
-    const { ctx, game } = this;
+    const { ctx, game, fx } = this;
+    const elapsed = fx ? performance.now() - fx.start : 0;
+    if (fx) this.stepFxCamera(fx, elapsed);
     const { board } = game;
     const { size, dirs } = board;
     const p = this.pitch;
@@ -319,7 +476,7 @@ export class BoardView {
       ctx.lineWidth = 2;
       ctx.strokeStyle = COLORS.red;
       ctx.stroke();
-      this.onViewChange();
+      this.endFrame(elapsed, ox, oy, p, s);
       return;
     }
 
@@ -340,6 +497,15 @@ export class BoardView {
           ctx.globalAlpha = 1;
         }
       }
+    }
+    this.endFrame(elapsed, ox, oy, p, s);
+  }
+
+  /** 盤面を描いたあと: 演出中なら重ねて描き、次のフレームも描く */
+  private endFrame(elapsed: number, ox: number, oy: number, p: number, s: number) {
+    if (this.fx) {
+      this.drawFx(this.fx, elapsed, ox, oy, p, s);
+      this.requestDraw();
     }
     this.onViewChange();
   }

@@ -774,6 +774,13 @@ img {
   color: var(--ink-sub);
   text-align: center;
 }
+/* ゲームオーバーで宝の位置を伝える一言 */
+.result-card__hint {
+  margin: -4px -13px 0;
+  font-size: 13px;
+  color: var(--ink-sub);
+  text-align: center;
+}
 .share-row {
   margin-top: 10px;
   width: 100%;
@@ -1199,4 +1206,29 @@ img {
   font-size: 14px;
   z-index: 20;
   pointer-events: none;
+}
+
+/* ===== 結果カードの登場（宝の演出のあと） ===== */
+@media (prefers-reduced-motion: no-preference) {
+  .result-card {
+    animation: result-in 0.7s ease-out;
+  }
+  @keyframes result-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+  /* PC は盤面の中央に重ねるので、中央寄せの translate を保ったまま下から出す */
+  @media (min-width: 1024px) {
+    .game--pc .result-card {
+      animation-name: result-in-pc;
+    }
+    @keyframes result-in-pc {
+      from {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 16px));
+      }
+    }
+  }
 }

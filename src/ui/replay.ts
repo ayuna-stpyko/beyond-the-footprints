@@ -2,6 +2,7 @@ import type { GameState } from '../core/game';
 import { canvasImages } from './assets';
 import { CellLook, paintCell, paintStartMark } from './cellPainter';
 import { CELL_RATIO, COLORS, GAP_RATIO } from './constants';
+import { paintSparkles } from './endFx';
 
 /** 切り出し範囲の最小マス数（一辺） */
 const MIN_SPAN = 7;
@@ -13,10 +14,26 @@ const RADIUS_RATIO = 0.04;
 /** マスがこれより小さいときは軌跡の線で描く */
 const MIN_CELL_PX = 6;
 
-// リプレイの1フレームを描画
-export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, step: number, px: number) {
+/** 軌跡を線で描くときの太さ（画像の一辺に対する割合と下限） */
+const TRAIL_WIDTH_RATIO = 1 / 120;
+const TRAIL_MIN_WIDTH_PX = 2;
+
+/**
+ * 一辺 px の画像に、盤面のどの範囲をどの大きさで描くか。
+ * - 大きい盤面（全体を描くとマスが細かく描けない）: 盤面全体を描く。
+ *   スタート・宝・現在地が盤面のどこにあるかが分かるように
+ * - 小さい盤面: 歩いた範囲と宝が収まるところを切り出して大きく描く
+ */
+function replayLayout(game: GameState, px: number) {
   const { board, log } = game;
-  const { size, dirs } = board;
+  const { size } = board;
+  const pad = px * PAD_RATIO;
+  const pitchOf = (span: number) => (px - 2 * pad) / (span - GAP_RATIO);
+
+  if (pitchOf(size) * CELL_RATIO < MIN_CELL_PX) {
+    const pitch = pitchOf(size);
+    return { r0: 0, c0: 0, span: size, pad, pitch, cell: pitch * CELL_RATIO };
+  }
 
   // 切り出し範囲: 軌跡と宝の外接矩形 + 1 マスの余白を正方形にする（最小 7 マス）
   let rMin = size, rMax = -1, cMin = size, cMax = -1;
@@ -32,9 +49,37 @@ export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, 
   const r0 = clamp(Math.round((rMin + rMax) / 2 - span / 2 + 0.5), 0, size - span);
   const c0 = clamp(Math.round((cMin + cMax) / 2 - span / 2 + 0.5), 0, size - span);
 
-  const pad = px * PAD_RATIO;
-  const pitch = (px - 2 * pad) / (span - GAP_RATIO);
-  const cell = pitch * CELL_RATIO;
+  const pitch = pitchOf(span);
+  return { r0, c0, span, pad, pitch, cell: pitch * CELL_RATIO };
+}
+
+/**
+ * リプレイの画像での宝のマスの中心と大きさ（演出を重ねる位置）。
+ * マスが小さすぎて線で描く表示のときは、宝のアイコンの大きさを返す
+ */
+export function replayTreasureSpot(game: GameState, px: number) {
+  const { treasure, size } = game.board;
+  const { r0, c0, pad, pitch, cell } = replayLayout(game, px);
+  const r = Math.floor(treasure / size) - r0;
+  const c = (treasure % size) - c0;
+  if (cell < MIN_CELL_PX) return { cx: pad + (c + 0.5) * pitch, cy: pad + (r + 0.5) * pitch, s: (px / 40) * 3 };
+  return { cx: pad + c * pitch + cell / 2, cy: pad + r * pitch + cell / 2, s: cell };
+}
+
+/** リプレイと GIF は小さく描くので、きらめきをゲーム中より大きめにする */
+const SPARKLE_SCALE = 1.4;
+
+/** クリアしたリプレイの宝のまわりに、きらめきを濃さ alpha で重ねる（画像からはみ出さないように） */
+export function paintReplaySparkles(ctx: CanvasRenderingContext2D, game: GameState, px: number, alpha: number) {
+  const { cx, cy, s } = replayTreasureSpot(game, px);
+  paintSparkles(ctx, cx, cy, s * SPARKLE_SCALE, alpha, { w: px, h: px });
+}
+
+// リプレイの1フレームを描画
+export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, step: number, px: number) {
+  const { board, log } = game;
+  const { size, dirs } = board;
+  const { r0, c0, span, pad, pitch, cell } = replayLayout(game, px);
 
   ctx.clearRect(0, 0, px, px);
   ctx.fillStyle = COLORS.boardBg;
@@ -89,7 +134,7 @@ function drawReplayMap(
   ctx.fillRect(pad, pad, span * pitch, span * pitch);
 
   ctx.strokeStyle = COLORS.red;
-  ctx.lineWidth = Math.max(1.5, px / 160);
+  ctx.lineWidth = Math.max(TRAIL_MIN_WIDTH_PX, px * TRAIL_WIDTH_RATIO);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.beginPath();

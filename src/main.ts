@@ -5,6 +5,7 @@ import { generateBoardAsync } from './core/generateAsync';
 import { type GameState, movesUsed, newGame } from './core/game';
 import type { GenerateOptions } from './core/generate';
 import { randomSeed } from './core/rng';
+import { TUTORIAL_N, tutorialBoard, type TutorialStage } from './core/tutorial';
 import type { Board } from './core/types';
 import { validateBoard } from './core/validate';
 import { loadCanvasImages } from './ui/assets';
@@ -16,6 +17,7 @@ import { genErrorScreen } from './ui/screens/genError';
 import { nInputScreen } from './ui/screens/nInput';
 import { openRules } from './ui/screens/rules';
 import { type ChallengeStatus, titleScreen } from './ui/screens/title';
+import { tutorialHooks } from './ui/tutorial';
 
 const app = document.getElementById('app')!;
 // ボタンの長押しで出る「画像を保存」などのメニューを出さない
@@ -66,7 +68,51 @@ function showTitle() {
   genToken++;
   history.replaceState(null, '', import.meta.env.BASE_URL + (debug ? '?debug' : ''));
   const status = Object.fromEntries(PERIODS.map((p) => [p, challengeStatus(p)]));
-  mount(titleScreen({ start: showNInput, rules: openRules, challenge: startChallenge }, status));
+  mount(titleScreen({ start: showNInput, tutorial: () => showTutorial(1), rules: openRules, challenge: startChallenge }, status));
+}
+
+/** チュートリアルを一度でも開いたか。初回起動のときだけ自動で開くために覚えておく */
+const TUTORIAL_SEEN_KEY = 'beyond-footprints:tutorial-seen';
+function tutorialSeen() {
+  try {
+    return localStorage.getItem(TUTORIAL_SEEN_KEY) !== null;
+  } catch {
+    // 読めない環境では毎回自動で開かないようにする
+    return true;
+  }
+}
+function markTutorialSeen() {
+  try {
+    localStorage.setItem(TUTORIAL_SEEN_KEY, '1');
+  } catch {
+    // 保存できなくても遊べる
+  }
+}
+
+const NEXT_STAGE: Record<TutorialStage, TutorialStage | null> = { 1: 2, 2: 3, 3: null };
+
+/** チュートリアルのステージを始める。attempt はステージ3で何枚目の地図か */
+function showTutorial(stage: TutorialStage, attempt = 0) {
+  genToken++;
+  challenge = null;
+  markTutorialSeen();
+  history.replaceState(null, '', `${import.meta.env.BASE_URL}?tutorial${debug ? '&debug' : ''}`);
+  board = tutorialBoard(stage, attempt, randomSeed());
+  const g = newGame(board);
+  game = g;
+  const again = () => showTutorial(stage, stage === 3 ? attempt + 1 : attempt);
+  const next = NEXT_STAGE[stage];
+  const tutorial = tutorialHooks(stage, {
+    next: () => (next ? showTutorial(next) : showTitle()),
+    retry: again,
+    title: showTitle,
+    play: () => {
+      lastN = TUTORIAL_N;
+      showNInput();
+    },
+  });
+  // チュートリアルでは「やりなおす」も結果のシェアも出さない
+  mount((root) => gameScreen(root, g, { title: showTitle, restart: again, again, shareUrl: '', tutorial }, debug));
 }
 
 function showNInput() {
@@ -201,6 +247,9 @@ void loadCanvasImages().then(() => {
     // 共有された盤面がこの端末の上限を超えるときは、N 入力画面で理由を見せる
     lastN = n;
     showNInput();
+  } else if (params.has('tutorial') || !tutorialSeen()) {
+    // はじめて開いたときはチュートリアルから
+    showTutorial(1);
   } else {
     showTitle();
   }

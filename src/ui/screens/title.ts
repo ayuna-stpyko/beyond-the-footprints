@@ -7,6 +7,7 @@ export type ChallengeStatus = 'new' | 'playing' | 'won';
 
 export interface TitleActions {
   start: () => void;
+  tutorial: () => void;
   rules: () => void;
   challenge: (p: Period) => void;
 }
@@ -28,7 +29,12 @@ export function titleScreen(actions: TitleActions, status: Partial<Record<Period
     {},
     brand(),
     grid,
-    h('button.btn.btn--primary.btn--wide', { onclick: actions.start }, 'スタート'),
+    h(
+      'div.title-actions',
+      {},
+      h('button.btn.btn--primary.btn--wide', { onclick: actions.start }, 'スタート'),
+      h('button.btn.btn--secondary.btn--wide', { onclick: actions.tutorial }, 'チュートリアル'),
+    ),
     h(
       'section.challenges',
       {},

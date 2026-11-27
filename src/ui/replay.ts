@@ -1,6 +1,6 @@
 import type { GameState } from '../core/game';
 import { canvasImages } from './assets';
-import { CellLook, paintCell, paintStartMark } from './cellPainter';
+import { CellLook, paintCell, paintRouteHint, paintStartMark } from './cellPainter';
 import { CELL_RATIO, COLORS, GAP_RATIO } from './constants';
 import { paintSparkles } from './endFx';
 
@@ -75,8 +75,11 @@ export function paintReplaySparkles(ctx: CanvasRenderingContext2D, game: GameSta
   paintSparkles(ctx, cx, cy, s * SPARKLE_SCALE, alpha, { w: px, h: px });
 }
 
-// リプレイの1フレームを描画
-export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, step: number, px: number) {
+/**
+ * リプレイの1フレームを描画。revealRoute なら、最後のコマ（宝が見えたところ）で
+ * 通らなかった足跡も薄く描く。シェアする GIF では道を明かさないので使わない
+ */
+export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, step: number, px: number, revealRoute = false) {
   const { board, log } = game;
   const { size, dirs } = board;
   const { r0, c0, span, pad, pitch, cell } = replayLayout(game, px);
@@ -95,7 +98,9 @@ export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, 
   const seen = new Uint8Array(size * size);
   for (let k = 0; k <= step; k++) seen[log[k]] = 1;
   const pos = log[step];
-  const won = game.status === 'won' && step === log.length - 1;
+  const isLast = step === log.length - 1;
+  const won = game.status === 'won' && isLast;
+  const showRoute = revealRoute && isLast;
 
   for (let r = r0; r < r0 + span; r++) {
     for (let c = c0; c < c0 + span; c++) {
@@ -105,7 +110,10 @@ export function drawReplayFrame(ctx: CanvasRenderingContext2D, game: GameState, 
       else if (seen[i]) look = dirs[i] ? CellLook.Arrow : CellLook.Nothing;
       const isPlayer = i === pos && !won;
       const dir = look === CellLook.Arrow || (isPlayer && dirs[i]) ? dirs[i] : 0;
-      paintCell(ctx, pad + (c - c0) * pitch, pad + (r - r0) * pitch, cell, look, dir, isPlayer, i === log[0]);
+      const x = pad + (c - c0) * pitch;
+      const y = pad + (r - r0) * pitch;
+      paintCell(ctx, x, y, cell, look, dir, isPlayer, i === log[0]);
+      if (showRoute && !seen[i] && dirs[i]) paintRouteHint(ctx, x, y, cell, dirs[i]);
     }
   }
 }

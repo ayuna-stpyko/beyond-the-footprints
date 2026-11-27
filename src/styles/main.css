@@ -17,6 +17,8 @@
   /* 英字のゲーム名（Yuji Boku の英字は R が A に見えるので使わない） */
   --font-logo: 'Yuji Syuku', serif;
   --shadow-float: 0 3px 8px rgba(74, 43, 20, 0.25);
+  /* チュートリアルで部品を指す枠と矢印 */
+  --tut-alert: #c0392b;
 }
 
 *,
@@ -308,6 +310,12 @@ img {
 .title-screen {
   justify-content: center;
   gap: 32px;
+}
+.title-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 .n-screen {
   justify-content: center;
@@ -807,6 +815,71 @@ img {
   padding: 16px 12px;
 }
 
+/* ===== チュートリアル ===== */
+/* 盤面の下側に重ねる説明。1 歩動くか、タップすると消える */
+.tut-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 3;
+  width: calc(100% - 24px);
+  max-width: 360px;
+  padding: 10px 14px 12px;
+  background: var(--paper);
+  border: 1.2px solid var(--brown-line);
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(74, 43, 20, 0.25);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+/* 枠で囲み、真下から矢印で指す */
+.tut-focus {
+  position: relative;
+  z-index: 4;
+  outline: 3px solid var(--tut-alert);
+  outline-offset: 2px;
+}
+.tut-pointer {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  width: 30px;
+  height: 46px;
+  margin-left: -15px;
+  background: url('../assets/tutorial-pointer.svg') center / contain no-repeat;
+  pointer-events: none;
+  animation: tut-bob 0.8s ease-in-out infinite alternate;
+}
+/* 残り体力は数字（右寄せ）の下を指す。紙の縁の分だけ下げる */
+.hud.tut-focus .tut-pointer {
+  top: calc(100% + 12px);
+  left: auto;
+  right: 12px;
+  margin-left: 0;
+}
+@keyframes tut-bob {
+  to {
+    translate: 0 -6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tut-pointer {
+    animation: none;
+  }
+}
+.tut-card__body {
+  margin: 0;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
 /* ===== PC レイアウト ===== */
 @media (min-width: 1024px) {
   .game--pc {
@@ -951,6 +1024,22 @@ img {
     transform: translate(-50%, -50%);
     width: 350px;
     z-index: 2;
+  }
+  /* チュートリアル: 説明は右下の拡大・縮小と重ならないよう左下に出す */
+  .game--pc .tut-bubble {
+    left: 24px;
+    bottom: 18px;
+    transform: none;
+    width: 360px;
+  }
+  /* 結果は盤面（宝の位置）を隠さないよう、サイドバーの残り体力の下に出す */
+  .game--pc .tut-card {
+    position: static;
+    transform: none;
+    width: auto;
+  }
+  .game--pc .tut-card .result-card__title {
+    font-size: 28px;
   }
 }
 
@@ -1223,6 +1312,10 @@ img {
   @media (min-width: 1024px) {
     .game--pc .result-card {
       animation-name: result-in-pc;
+    }
+    /* チュートリアルのカードはサイドバーに置くので、中央寄せの translate はない */
+    .game--pc .tut-card {
+      animation-name: result-in;
     }
     @keyframes result-in-pc {
       from {

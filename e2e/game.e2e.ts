@@ -37,9 +37,14 @@ async function openBoard(page: Page, n: number, seed: number) {
 
 const hudLeft = (page: Page) => page.locator('.hud__left');
 
-// どのテストでも、ページ内の未処理の例外やコンソールエラーがないこと
-const test = base.extend<{ page: Page }>({
-  page: async ({ page }, use) => {
+/**
+ * どのテストでも、ページ内の未処理の例外やコンソールエラーがないこと。
+ * はじめて開くとチュートリアルが自動で始まるので、ふだんは見たことにしておく（tutorialSeen: false で外す）
+ */
+const test = base.extend<{ page: Page; tutorialSeen: boolean }>({
+  tutorialSeen: [true, { option: true }],
+  page: async ({ page, tutorialSeen }, use) => {
+    if (tutorialSeen) await page.addInitScript(() => localStorage.setItem('beyond-footprints:tutorial-seen', '1'));
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (m) => {
@@ -197,4 +202,45 @@ test('resumes a challenge after reloading and counts a retry as the next attempt
   // タイトルには挑戦中と出る
   await page.goto('');
   await expect(page.getByRole('button', { name: /デイリー.*挑戦中/ })).toBeVisible();
+});
+
+test.describe('tutorial', () => {
+  test.describe('first visit', () => {
+    test.use({ tutorialSeen: false });
+
+    test('opens the tutorial automatically only the first time', async ({ page }) => {
+      await page.goto('');
+      await expect(page.getByText('チュートリアル 1 / 3')).toBeVisible();
+      await page.goto('');
+      await expect(page.getByRole('button', { name: 'スタート' })).toBeVisible();
+    });
+  });
+
+  test('walks through stages 1 and 2 to stage 3', async ({ page }) => {
+    await page.goto('');
+    await page.getByRole('button', { name: 'チュートリアル' }).click();
+    await expect(page.getByText('チュートリアル 1 / 3')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'やりなおす' })).toHaveCount(0);
+    await expect(page.locator('.tut-bubble')).toContainText('上へ 1 歩進んでみよう');
+
+    // ステージ1は矢印をたどれば着く（↑↑→→↓↓↓←←←←）
+    const route = ['ArrowUp', 'ArrowUp', 'ArrowRight', 'ArrowRight', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft', 'ArrowLeft'];
+    // oxlint-disable-next-line no-await-in-loop
+    for (const k of route) await page.keyboard.press(k);
+    await expect(page.locator('.tut-card .result-card__title')).toHaveText('宝を見つけた！', { timeout: FX_MAX_MS + 2000 });
+    await expect(page.locator('.tut-focus .tut-pointer')).toBeVisible();
+    await page.getByRole('button', { name: '次へ' }).click();
+
+    // ステージ2は矢印どおりでは届かない
+    await expect(page.getByText('チュートリアル 2 / 3')).toBeVisible();
+    await expect(page.locator('.hud.tut-focus')).toBeVisible();
+    // 中央の行を左右に往復して体力を使い切る（宝は中央の行にない）
+    // oxlint-disable-next-line no-await-in-loop
+    for (let i = 0; i < 36; i++) await page.keyboard.press(i % 2 === 0 ? 'ArrowLeft' : 'ArrowRight');
+    await expect(page.locator('.tut-card .result-card__title')).toHaveText('体力が尽きた', { timeout: FX_MAX_MS + 2000 });
+    await page.getByRole('button', { name: '次へ' }).click();
+
+    await expect(page.getByText('チュートリアル 3 / 3')).toBeVisible();
+    await expect(hudLeft(page)).toHaveText('36');
+  });
 });

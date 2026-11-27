@@ -115,6 +115,17 @@ export function paintCell(
   if (start) paintStartMark(ctx, x + 7 * k, y + 7 * k, 3 * k);
 }
 
+/** 通らなかった探検家の足跡の濃さ */
+const ROUTE_HINT_ALPHA = 0.3;
+
+/** 通らなかった探検家の足跡（矢印のマス）を薄く描く。宝が見えたあとに道の全体を見せる */
+export function paintRouteHint(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, dir: number) {
+  ctx.save();
+  ctx.globalAlpha = ROUTE_HINT_ALPHA;
+  paintCell(ctx, x, y, s, CellLook.Arrow, dir, false);
+  ctx.restore();
+}
+
 /** スタート地点の印（Figma の Cell / Start=true: 左上の点） */
 export function paintStartMark(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
   ctx.beginPath();

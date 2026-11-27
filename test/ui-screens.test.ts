@@ -401,21 +401,25 @@ describe('titleScreen', () => {
     setupDom();
   });
 
-  it('wires スタート and あそびかた to their actions', () => {
+  it('wires スタート, チュートリアル and あそびかた to their actions', () => {
     const start = vi.fn<() => void>();
+    const tutorial = vi.fn<() => void>();
     const rules = vi.fn<() => void>();
-    const screen = titleScreen({ start, rules, challenge: () => {} });
+    const screen = titleScreen({ start, tutorial, rules, challenge: () => {} });
     document.body.append(screen);
     button('スタート', screen).click();
     expect(start).toHaveBeenCalledTimes(1);
     expect(rules).not.toHaveBeenCalled();
+    button('チュートリアル', screen).click();
+    expect(tutorial).toHaveBeenCalledTimes(1);
     $('button[aria-label="あそびかた"]', screen).click();
     expect(rules).toHaveBeenCalledTimes(1);
     expect(start).toHaveBeenCalledTimes(1);
+    expect(tutorial).toHaveBeenCalledTimes(1);
   });
 
   it('draws a 5x5 decorative grid with one treasure and one player', () => {
-    const screen = titleScreen({ start: () => {}, rules: () => {}, challenge: () => {} });
+    const screen = titleScreen({ start: () => {}, tutorial: () => {}, rules: () => {}, challenge: () => {} });
     expect(screen.querySelectorAll('.mini-grid__row').length).toBe(5);
     expect(screen.querySelectorAll('.mini-grid .cell').length).toBe(25);
     expect(screen.querySelectorAll('.cell--treasure').length).toBe(1);

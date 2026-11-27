@@ -1,5 +1,5 @@
 import type { GameState } from '../core/game';
-import { CellLook, paintCell, paintStartMark } from './cellPainter';
+import { CellLook, paintCell, paintRouteHint, paintStartMark } from './cellPainter';
 import { COLORS, GAP_RATIO, MIN_DETAIL_CELL_PX, PITCH_PX, redAlpha } from './constants';
 import { centerIndex } from '../core/types';
 import { h } from './dom';
@@ -22,6 +22,8 @@ import {
 } from './endFx';
 
 const FIT_PAD = 8;
+/** 縮小表示で探検家の道を塗るのは、見えているマスがこれ以下のときだけ（多いと演出がかくつく） */
+const MAX_SPARSE_ROUTE_CELLS = 250_000;
 /** 拡大の上限。縮小は盤面全体が収まる倍率まで */
 const MAX_ZOOM = 2;
 /** ホイール 1px あたりのズームの強さ */
@@ -85,6 +87,8 @@ export class BoardView {
   private fx: EndFxState | null = null;
   private fxTimer = 0;
   onViewChange: () => void = () => {};
+  /** 終わったら（宝が見えたら）、通らなかった足跡も薄く描く。チャレンジでは描かない */
+  revealRoute = false;
 
   constructor(
     game: GameState,
@@ -421,6 +425,8 @@ export class BoardView {
     const oy = this.h / 2 - this.camY * p + (p - s) / 2;
     const ended = game.status !== 'playing';
     const start = centerIndex(board.n);
+    // 通らなかった足跡も見せるか（開発用の ?debug ではいつでも見せる）
+    const showRoute = this.debug || (ended && this.revealRoute);
 
     const lookOf = (i: number): CellLook => {
       if (ended && i === board.treasure) return game.status === 'won' ? CellLook.Found : CellLook.Treasure;
@@ -459,7 +465,7 @@ export class BoardView {
         }
         ctx.stroke();
       }
-      if (this.debug) this.drawRouteSparse(ox, oy, p);
+      if (showRoute) this.drawRouteSparse(ox, oy, p, r0, r1, c0, c1);
       for (const i of new Set(game.log)) {
         paintCell(ctx, ox + (i % size) * p, oy + Math.floor(i / size) * p, p, lookOf(i), 0, false);
       }
@@ -491,11 +497,7 @@ export class BoardView {
         const isPlayer = i === game.pos;
         const showDir = look === CellLook.Arrow || (isPlayer && dirs[i] > 0 && look !== CellLook.Found);
         paintCell(ctx, ox + c * p, oy + r * p, s, look, showDir ? dirs[i] : 0, isPlayer && look !== CellLook.Found, i === start);
-        if (this.debug && !game.visited[i] && dirs[i]) {
-          ctx.globalAlpha = 0.25;
-          paintCell(ctx, ox + c * p, oy + r * p, s, CellLook.Arrow, dirs[i], false);
-          ctx.globalAlpha = 1;
-        }
+        if (showRoute && !game.visited[i] && dirs[i]) paintRouteHint(ctx, ox + c * p, oy + r * p, s, dirs[i]);
       }
     }
     this.endFrame(elapsed, ox, oy, p, s);
@@ -522,11 +524,18 @@ export class BoardView {
     if (x1 > x0 && y1 > y0) this.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
-  private drawRouteSparse(ox: number, oy: number, p: number) {
+  /**
+   * 縮小表示で探検家の道を薄く塗る（見えている範囲だけ）。
+   * 大盤面の全体表示では数百万マスになり、演出中に毎フレーム塗ると重いので、多すぎるときは描かない
+   */
+  private drawRouteSparse(ox: number, oy: number, p: number, r0: number, r1: number, c0: number, c1: number) {
+    if ((r1 - r0 + 1) * (c1 - c0 + 1) > MAX_SPARSE_ROUTE_CELLS) return;
     const { size, dirs } = this.game.board;
     this.ctx.fillStyle = redAlpha(0.18);
-    for (let i = 0; i < dirs.length; i++) {
-      if (dirs[i]) this.ctx.fillRect(ox + (i % size) * p, oy + Math.floor(i / size) * p, p, p);
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        if (dirs[r * size + c]) this.ctx.fillRect(ox + c * p, oy + r * p, p, p);
+      }
     }
   }
 }

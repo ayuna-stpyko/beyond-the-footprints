@@ -27,12 +27,15 @@ export function replayTiming(last: number): { interval: number; perTick: number 
   return { interval, perTick };
 }
 
-// リプレイ
-export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boolean } = {}) {
+/**
+ * リプレイ。revealRoute なら最後のコマで通らなかった足跡も薄く見せる（チャレンジ以外）
+ */
+export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boolean; revealRoute?: boolean } = {}) {
   const last = game.log.length - 1;
   const canvas = h('canvas.replay__canvas', { width: px * 2, height: px * 2 });
   const ctx = canvas.getContext('2d')!;
   ctx.scale(2, 2);
+  const draw = (s: number) => drawReplayFrame(ctx, game, s, px, opts.revealRoute);
 
   let step = last;
   let timer = 0;
@@ -47,7 +50,7 @@ export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boo
 
   const show = (s: number) => {
     step = s;
-    drawReplayFrame(ctx, game, step, px);
+    draw(step);
     const pct = last === 0 ? 100 : (step / last) * 100;
     // つまみがトラックからはみ出さないよう、中心を [半径, 100% - 半径] に収める
     progress.style.width = `calc(${KNOB_PX / 2}px + (100% - ${KNOB_PX}px) * ${pct / 100})`;
@@ -61,7 +64,7 @@ export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boo
     if (!sparkleTimer) return;
     clearInterval(sparkleTimer);
     sparkleTimer = 0;
-    drawReplayFrame(ctx, game, step, px);
+    draw(step);
   };
   const sparkle = () => {
     const span = FX.won.sparkle;
@@ -70,7 +73,7 @@ export function replayPlayer(game: GameState, px: number, opts: { autoplay?: boo
     sparkleTimer = window.setInterval(() => {
       t += SPARKLE_TICK_MS;
       if (t >= span[1]) return stopSparkle();
-      drawReplayFrame(ctx, game, last, px);
+      draw(last);
       paintReplaySparkles(ctx, game, px, sparkleAlpha('won', t));
     }, SPARKLE_TICK_MS);
   };

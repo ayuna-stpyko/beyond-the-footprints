@@ -8,6 +8,7 @@ import { h, img } from '../dom';
 import { Minimap } from '../minimap';
 import { replayPlayer } from '../replayPlayer';
 import { type ChallengeInfo, shareButtons } from '../share';
+import type { TutorialBubble, TutorialHooks, TutorialResult } from '../tutorial';
 import { boardLabel, dpadButton, helpIconButton, helpLabelButton } from './common';
 import { modalOpen, openConfirm } from './confirm';
 import { openRules } from './rules';
@@ -24,6 +25,11 @@ export interface GameActions {
   challenge?: ChallengeInfo;
   /** 1 手動くたびに呼ぶ（自動セーブ用） */
   onMove?: () => void;
+  /**
+   * チュートリアルとして遊んでいるとき。「やりなおす」を出さず、盤面に説明を重ね、
+   * 結果はリプレイではなくチュートリアルのカードで見せる。計測もしない
+   */
+  tutorial?: TutorialHooks;
 }
 
 /**
@@ -31,11 +37,18 @@ export interface GameActions {
  * 狭い画面では「ウィークリー」「10/19〜」「・2回目」の区切りでだけ折り返す
  */
 const boardTitle = (g: GameState, actions: GameActions): (string | HTMLElement)[] => {
+  if (actions.tutorial) return [actions.tutorial.heading];
   const ch = actions.challenge;
   if (!ch) return [boardLabel(g.board.n)];
   const [name, ...rest] = ch.heading.split(' ');
   return [h('span.nowrap', {}, name), ' ', h('span.nowrap', {}, rest.join(' ')), h('span.nowrap', {}, `・${ch.attempt}回目`)];
 };
+
+/**
+ * 終わったら（宝が見えたら）通らなかった足跡も薄く見せるか。
+ * チャレンジ（デイリーなど）は全員が同じ盤面で、負けても同じ盤面に再挑戦するので見せない
+ */
+const revealRoute = (actions: GameActions) => !actions.challenge;
 
 /** チャレンジでクリアしたら、その盤面はもう遊べない */
 const locked = (g: GameState, actions: GameActions) => !!actions.challenge && g.status === 'won';
@@ -223,6 +236,57 @@ function resetButton(g: GameState, actions: GameActions) {
   return h('button.pill.pill--reset', { onclick }, 'やりなおす');
 }
 
+// ---------- チュートリアル ----------
+
+/** 画面の部品を枠で囲み、真下から矢印で指す。返り値で元に戻す */
+function pointAt(el: HTMLElement) {
+  const pointer = h('span.tut-pointer', { 'aria-hidden': 'true' });
+  el.classList.add('tut-focus');
+  el.append(pointer);
+  return () => {
+    el.classList.remove('tut-focus');
+    pointer.remove();
+  };
+}
+
+/**
+ * 盤面に重ねる説明（吹き出し）。次に 1 歩動くか、タップすると消える。
+ * targets は focus で指す部品
+ */
+function bubbleLayer(host: HTMLElement, targets: { hud: HTMLElement }) {
+  let el: HTMLElement | null = null;
+  let unpoint = noop;
+  const hide = () => {
+    el?.remove();
+    el = null;
+    unpoint();
+    unpoint = noop;
+  };
+  const show = (b: TutorialBubble | null) => {
+    hide();
+    if (!b) return;
+    el = h('button.tut-bubble', { onclick: hide, 'aria-label': `${b.text}（タップで閉じる）` }, b.text);
+    host.append(el);
+    if (b.focus) unpoint = pointAt(targets[b.focus]);
+  };
+  return { show, hide };
+}
+
+/** チュートリアルの結果カード（十字キーの代わりに出す） */
+function tutorialCard(r: TutorialResult, won: boolean) {
+  return h(
+    'section.result-card.paper.paper--result.tut-card',
+    {},
+    h(`div.result-card__title${won ? '' : '.result-card__title--lost'}`, {}, r.title),
+    h('p.tut-card__body', {}, r.body),
+    h(
+      'div.result-card__actions',
+      {},
+      ...r.actions.map((a) => h(`button.btn.${a.primary ? 'btn--primary' : 'btn--secondary'}`, { onclick: a.onClick }, a.label)),
+    ),
+  );
+}
+
 /** 長押しで連続移動を始めるまでの時間 */
 const REPEAT_DELAY_MS = 350;
 /** 連続移動の間隔 */
@@ -300,6 +364,7 @@ function controller(
   refresh: () => void,
   onEnd: () => void,
   onMove: () => void = noop,
+  track = true,
 ) {
   const doMove = (d: Exclude<Dir, 0>) => {
     if (!move(game, d)) return;
@@ -307,7 +372,7 @@ function controller(
     view.follow();
     refresh();
     if (game.status !== 'playing') {
-      trackEnd(game);
+      if (track) trackEnd(game);
       // 宝のマスを強調する演出が終わってから結果を出す（ゲームオーバーなら宝までカメラを動かす）
       view.playEndFx(game.status, onEnd);
     }
@@ -340,18 +405,22 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
   const mode = panelInner / (size - GAP_RATIO) >= MIN_FIT_PITCH ? 'fit' : 'explore';
 
   const view = new BoardView(game, mode, debug);
+  view.revealRoute = revealRoute(actions);
   const h1 = hud();
   const badge = positionBadge();
   const zoom = zoomControls(view, true);
   const minimap = mode === 'explore' ? new Minimap(game, view, MINIMAP_PX_MOBILE) : null;
 
+  const tut = actions.tutorial;
   const home = titleButton(game, actions, false);
   const help = helpIconButton(openRules);
   const reset = resetButton(game, actions);
-  const headerActions = h('div.header-actions', {}, home, help, reset);
+  // チュートリアルでは「やりなおす」を出さない
+  const headerActions = h('div.header-actions', {}, home, help, tut ? null : reset);
   const panel = h(`section.board-panel.paper.paper--grid.board-panel--${mode}`, {}, view.el);
   panel.style.position = 'relative';
   if (mode === 'explore') panel.append(badge.el, zoom.el);
+  const bubble = bubbleLayer(panel, { hud: h1.el });
 
   const bottom = h(`div.game__bottom${mode === 'explore' ? '.game__bottom--explore' : ''}`);
   const hint = h('p.game__hint', {}, 'PC では矢印キーでも移動できます');
@@ -368,13 +437,22 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
   let replay: ReturnType<typeof replayPlayer> | null = null;
   const showControls = (justEnded = false) => {
     bottom.replaceChildren();
+    if (game.status !== 'playing' && tut) {
+      // チュートリアルは盤面を残したまま、十字キーの場所にカードを出す
+      bubble.hide();
+      const r = tut.result(game);
+      bottom.append(tutorialCard(r, game.status === 'won'));
+      if (r.focus === 'help') pointAt(help);
+      hint.remove();
+      return;
+    }
     if (game.status !== 'playing') {
       // 結果カードに「タイトルへ」と「あそびかた」の代わりがあるので、ヘッダーからは外す
       home.remove();
       help.remove();
       if (locked(game, actions)) reset.remove();
       // 盤面の枠をリプレイ（GIF と同じ絵）に差し替える。終わった直後は自動で 1 回再生する
-      replay = replayPlayer(game, REPLAY_PX_MOBILE, { autoplay: justEnded });
+      replay = replayPlayer(game, REPLAY_PX_MOBILE, { autoplay: justEnded, revealRoute: revealRoute(actions) });
       panel.className = 'board-panel paper paper--grid board-panel--replay';
       panel.replaceChildren(replay.el);
       bottom.append(resultCard(game, actions));
@@ -390,7 +468,11 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
       bottom.append(dpad(ctrl.doMove));
     }
   };
-  const ctrl = controller(game, view, refresh, () => showControls(true), actions.onMove);
+  const onMove = () => {
+    actions.onMove?.();
+    if (tut) bubble.show(game.status === 'playing' ? tut.bubble(game) : null);
+  };
+  const ctrl = controller(game, view, refresh, () => showControls(true), onMove, !tut);
 
   root.append(
     h(
@@ -411,6 +493,7 @@ function renderMobile(root: HTMLElement, game: GameState, actions: GameActions, 
   showControls();
   refresh();
   view.recenter();
+  if (tut && game.status === 'playing') bubble.show(tut.bubble(game));
   return () => {
     ctrl.dispose();
     view.destroy();
@@ -424,6 +507,7 @@ const key = (k: string, label: string) => h('div.keys__row', {}, h('span.key', {
 
 function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debug: boolean) {
   const view = new BoardView(game, 'explore', debug);
+  view.revealRoute = revealRoute(actions);
   const h1 = hud();
   const badge = positionBadge();
   const zoom = zoomControls(view, false);
@@ -440,13 +524,28 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
     minimap.draw();
   };
   let replay: ReturnType<typeof replayPlayer> | null = null;
+  const tut = actions.tutorial;
   const reset = resetButton(game, actions);
+  const help = helpLabelButton(openRules);
+  const bubble = bubbleLayer(panel, { hud: h1.el });
   const onEnd = (justEnded = false) => {
+    if (tut) {
+      bubble.hide();
+      const r = tut.result(game);
+      // 盤面に重ねると宝の位置が隠れるので、サイドバーの残り体力の下に出す
+      h1.el.after(tutorialCard(r, game.status === 'won'));
+      if (r.focus === 'help') pointAt(help);
+      return;
+    }
     if (locked(game, actions)) reset.remove();
-    replay = replayPlayer(game, REPLAY_PX_PC, { autoplay: justEnded });
+    replay = replayPlayer(game, REPLAY_PX_PC, { autoplay: justEnded, revealRoute: revealRoute(actions) });
     panel.append(resultCard(game, actions, replay.el));
   };
-  const ctrl = controller(game, view, refresh, () => onEnd(true), actions.onMove);
+  const onMove = () => {
+    actions.onMove?.();
+    if (tut) bubble.show(game.status === 'playing' ? tut.bubble(game) : null);
+  };
+  const ctrl = controller(game, view, refresh, () => onEnd(true), onMove, !tut);
 
   root.append(
     h(
@@ -456,7 +555,7 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
         'aside.sidebar',
         {},
         h('div', {}, h('div.sidebar__title', {}, 'BEYOND THE', h('br'), 'FOOTPRINTS'), h('div.sidebar__sub', {}, ...boardTitle(game, actions))),
-        h('div.actions', {}, helpLabelButton(openRules), reset, titleButton(game, actions, true)),
+        h('div.actions', {}, help, tut ? null : reset, titleButton(game, actions, true)),
         h1.el,
         h(
           'section.side-card.paper',
@@ -491,6 +590,7 @@ function renderPC(root: HTMLElement, game: GameState, actions: GameActions, debu
   refresh();
   view.recenter();
   if (game.status !== 'playing') onEnd();
+  else if (tut) bubble.show(tut.bubble(game));
   return () => {
     ctrl.dispose();
     view.destroy();
